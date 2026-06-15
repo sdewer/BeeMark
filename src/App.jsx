@@ -4,8 +4,8 @@ const C = {
   primary:"#2DBD8F", primaryDark:"#1E9B73", primaryLight:"#D6F5EC",
   accent:"#3B9EE8", bg:"#F4F7F6", surface:"#FFFFFF", surfaceAlt:"#F0FAF6",
   textPrimary:"#1C2B28", textSecondary:"#5A7268", textMuted:"#9BB5AC",
-  statusOK:"#2DBD8F", statusQueenless:"#E53935", statusRequeening:"#F57C00",
-  statusQuarantine:"#3B9EE8", statusArchived:"#9BB5AC",
+  statusQueenless:"#E53935", statusRequeening:"#F57C00",
+  statusArchived:"#9BB5AC",
   green:"#2DBD8F", red:"#E53935", orange:"#F57C00", blue:"#3B9EE8",
   border:"#DDE9E5", borderFocus:"#2DBD8F",
 };
@@ -505,7 +505,6 @@ const nextColor = (usedColors) => {
   const used = new Set(usedColors);
   const unused=COLOR_PALETTE.find(c=>!used.has(c)); if(unused) return unused; return COLOR_PALETTE[usedColors.length%COLOR_PALETTE.length]||COLOR_PALETTE[0];
 };
-const APIARY_COLORS = ["#2DBD8F","#3B9EE8","#E53935","#F57C00","#8E24AA","#00897B","#43A047","#0288D1","#E91E63","#FF6F00","#1565C0","#558B2F"];
 
 // ── Apiary Edit Form ──────────────────────────────────────────────────────
 const ApiaryEdit = ({ apiary, onSave, onCancel }) => {
@@ -521,7 +520,7 @@ const ApiaryEdit = ({ apiary, onSave, onCancel }) => {
           <Field label="BeeBase Apiary ID"><Input value={form.beebase_id||""} onChange={v=>set("beebase_id",v)} placeholder="e.g. GB-1234567"/></Field>
           <Field label="Colour Accent">
             <div style={{ display:"flex",gap:8,flexWrap:"wrap" }}>
-              {APIARY_COLORS.map(col=>(
+              {COLOR_PALETTE.map(col=>(
                 <div key={col} onClick={()=>set("color",col)}
                   style={{ width:30,height:30,borderRadius:8,background:col,cursor:"pointer",border:form.color===col?"3px solid #333":"3px solid transparent",flexShrink:0 }}/>
               ))}
@@ -1193,7 +1192,6 @@ const HiveForm = ({ existing, apiaryId, allHives=[], onSave, onNavigate }) => {
     return {name:"",type:"National",isNuc:false,useBroodAsSuper:false,color:autoColor,location:"",status:"",installed:TODAY,source:"",queen_year:thisYear,queen_marked:false,queen_color:queenColorForYear(thisYear),boxes:1,supers:0,notes:"",apiaryId};
   });
   const set=(k,v)=>setForm(f=>({...f,[k]:v}));
-  const COLORS=COLOR_PALETTE;
   const handleYearChange=v=>{ set("queen_year",v); if(v&&String(v).length>=4) set("queen_color",queenColorForYear(v)); };
   const expectedColor=queenColorForYear(form.queen_year);
   const colorLabel=form.queen_color===expectedColor?`${form.queen_color} (${form.queen_year} year colour)`:`${form.queen_color} (Custom)`;
