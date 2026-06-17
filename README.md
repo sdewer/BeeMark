@@ -12,8 +12,9 @@
 <p align="center">
   <a href="https://ko-fi.com/dewberrybees"><img src="https://img.shields.io/badge/Support-Ko--fi-FF5E5B?logo=ko-fi&logoColor=white" alt="Ko-fi"/></a>
   <img src="https://img.shields.io/badge/React-JSX-61DAFB?logo=react&logoColor=white" alt="React"/>
-  <img src="https://img.shields.io/badge/Storage-localStorage-F7DF1E?logo=javascript&logoColor=black" alt="localStorage"/>
-  <img src="https://img.shields.io/badge/No_Build_Step-✓-2DBD8F" alt="No build"/>
+  <img src="https://img.shields.io/badge/Storage-IndexedDB-F7DF1E?logo=javascript&logoColor=black" alt="IndexedDB"/>
+  <img src="https://img.shields.io/badge/PWA-installable-2DBD8F" alt="PWA"/>
+  <img src="https://img.shields.io/badge/Android-APK-3DDC84?logo=android&logoColor=white" alt="Android APK"/>
 </p>
 
 ---
@@ -23,6 +24,10 @@
 BeeMark is a practical, no-fuss beekeeping companion designed for real-world use in the apiary. Log inspections, track treatments, manage multiple hives across multiple sites, and access quick-reference beekeeper resources — all from your phone, all stored locally.
 
 No account required. No subscription. No data leaves your device.
+
+Available as:
+- **A web app / installable PWA** — hosted on GitHub Pages
+- **An Android APK** — built with Capacitor for a native install experience
 
 ---
 
@@ -35,6 +40,7 @@ No account required. No subscription. No data leaves your device.
 - Hive status tracking: **Queenless**, **Requeening**, and **Archived**
 - **Auto queenless detection** — flags a hive if the queen hasn't been seen across two consecutive inspections
 - Queen tracking with **BKA colour marking chart** (year-based auto-assignment or custom override)
+- **Drag-to-reorder** hive list, with order saved per device
 
 ### Inspection Logging
 - Full inspection form with **Yes/No responses** for queen seen, eggs, larvae, capped brood, and queen cells
@@ -58,7 +64,8 @@ No account required. No subscription. No data leaves your device.
 ### Multi-Apiary Support
 - Manage **multiple apiaries** with names, locations, notes, and optional photos
 - Each apiary shows hive count, archived count, total supers, and last inspection date
-- Quick-switch between apiaries; tap through to a full apiary detail view
+- Shared 12-colour palette across hives and apiaries, with smart auto-assignment
+- Quick-switch between apiaries, including an **"All Apiaries"** combined view
 - BeeBase ID field for UK beekeepers registered with the National Bee Unit
 
 ### Equipment Shed
@@ -75,7 +82,8 @@ Built-in reference material for the apiary:
 ### Data & Backup
 - **Export** your full dataset as a dated JSON backup file
 - **Import** a backup to restore or transfer your data
-- All data stored locally in `localStorage` — nothing is sent anywhere
+- All data stored locally in the browser's **IndexedDB** — nothing is sent anywhere
+- Note: web (PWA) and Android app data are stored separately, since each runs in its own isolated browser context — use Export/Import to move data between them
 
 ---
 
@@ -84,11 +92,12 @@ Built-in reference material for the apiary:
 | | |
 |---|---|
 | **Framework** | React (functional components + hooks, no classes) |
+| **Build tool** | Vite |
 | **Styling** | Inline styles with a consistent design token system |
-| **Storage** | Browser `localStorage` |
+| **Storage** | Browser `IndexedDB` |
+| **Native shell** | Capacitor (Android) |
 | **Font** | Roboto via Google Fonts |
-| **Dependencies** | None — fully self-contained single JSX file |
-| **Build step** | None required |
+| **Dependencies** | Minimal — single-file app core, no UI framework |
 
 ---
 
@@ -106,13 +115,33 @@ BeeMark uses a warm, clean Android-inspired UI throughout:
 
 ## Running BeeMark
 
-BeeMark is a single `.jsx` file with no build step. To run it:
+### Web (PWA)
 
-1. Open it as an artifact in [Claude.ai](https://claude.ai) — it runs directly in the browser
-2. Or drop it into any React sandbox (CodeSandbox, StackBlitz, etc.)
-3. Or serve it with a minimal Vite/CRA setup if you want a standalone web app
+The live web app is built from `src/App.jsx` and deployed automatically to **GitHub Pages**. Visit the Pages URL for this repo, or:
 
-All data persists in your browser's `localStorage`.
+1. Clone the repo and run `npm install`
+2. `npm run dev` for a local dev server, or `npm run build` to produce a production build in `dist/`
+3. Open it on your phone's browser and choose **"Add to Home Screen"** to install it as a PWA
+
+### Android APK
+
+BeeMark also ships as a native Android app via [Capacitor](https://capacitorjs.com/), built from the same `src/App.jsx`:
+
+1. `npm run build:apk` — builds the web bundle with relative asset paths for the native shell
+2. `npx cap sync` — syncs the build into the Android project
+3. `npx cap open android` — opens the project in Android Studio
+4. Build → **Generate App Bundles / APKs**
+
+The Android project itself isn't tracked in this repo (it's regenerated locally via `npx cap add android`) — see [Releases](../../releases) for ready-to-install APKs.
+
+---
+
+## Downloads
+
+| Platform | How to get it |
+|---|---|
+| **Web / PWA** | Visit the GitHub Pages site, or "Add to Home Screen" on mobile |
+| **Android APK** | Download the latest `.apk` from the [Releases](../../releases) page |
 
 ---
 
