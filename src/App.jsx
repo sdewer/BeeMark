@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react";
+import { App as CapApp } from "@capacitor/app";
 
 const C = {
   primary:"#2DBD8F", primaryDark:"#1E9B73", primaryLight:"#D6F5EC",
@@ -2402,6 +2403,37 @@ export default function App() {
     };
     window.addEventListener("popstate",onPop);
     return ()=>window.removeEventListener("popstate",onPop);
+  },[]);
+
+  // Capacitor hardware back button (Android) — mirrors goBack(), only exits
+  // the app when already on the Hives root screen with nothing left to pop.
+  // Guarded to native platforms only; no-op on the GitHub Pages web build.
+  useEffect(()=>{
+    if(!(CapApp&&CapApp.addListener)) return;
+    let handle;
+    CapApp.addListener("backButton",()=>{
+      setNavStack(stack=>{
+        if(stack.length>1){
+          const newStack=stack.slice(0,-1);
+          const prev=newStack[newStack.length-1];
+          setScreen(prev.screen);
+          setParams(prev.params);
+          window.scrollTo(0,0);
+          return newStack;
+        }
+        // Stack exhausted — at a root screen
+        if(stack[0]&&stack[0].screen==="hives"){
+          CapApp.exitApp();
+          return stack;
+        }
+        // On a different root tab (Apiary/Info) — jump to Hives home
+        setScreen("hives");
+        setParams({});
+        window.scrollTo(0,0);
+        return [{screen:"hives",params:{}}];
+      });
+    }).then(h=>{ handle=h; });
+    return ()=>{ if(handle) handle.remove(); };
   },[]);
 
   if(!apiaries||apiaries.length===0){
