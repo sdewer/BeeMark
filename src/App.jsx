@@ -57,7 +57,7 @@ const INSPECTION_DEFAULTS = {
 };
 // Default empty action entry
 const emptyAction = () => ({id:uid(),type:"",qty:"1",details:"",swarm_status:"",old_queen_location:"",old_queen_hive_number:"",new_hive_name:"",new_hive_apiary_id:""});
-const ACTION_TYPES = ["Artificial Swarm","Split","Added Queen","Removed Queen","Clipped Queen","Added Queen Cell","Added Super","Removed Super","Added Brood Box","Removed Brood Box","Frame of Eggs Added","Frame of Eggs Removed","Feed","Remove Feeder","Move Hive","Combine Hive","Sold/Given Away","Other"];
+const ACTION_TYPES = ["Artificial Swarm","Split","Added Queen","Removed Queen","Clipped Queen","Added Queen Cell","Added Super","Removed Super","Added Brood Box","Removed Brood Box","Frame of Eggs Added","Frame of Eggs Removed","Feed","Remove Feeder","Move Hive","Combine Hive","Transfer to New Hive","Sold/Given Away","Other"];
 // Actions that affect super count (qty dropdown) or box count
 const SUPER_CHANGE_ACTIONS = ["Added Super","Removed Super"];
 const BOX_CHANGE_ACTIONS   = ["Added Brood Box","Removed Brood Box"];
@@ -458,16 +458,32 @@ const InspectionSummaryBar = ({ ins }) => {
 };
 
 // ── Apiary Setup (first-run + add new) ────────────────────────────────────
-const ApiarySetup = ({ onComplete, isAdding=false, onCancel, allApiaries=[] }) => {
+const ApiarySetup = ({ onComplete, isAdding=false, onCancel, allApiaries=[], onImportBackup }) => {
   const [form,setForm]=useState(()=>{
     const usedColors=allApiaries.map(a=>a.color).filter(Boolean);
     return {id:uid(),name:"",location:"",notes:"",beebase_id:"",color:nextColor(usedColors)};
   });
+  const [importStatus,setImportStatus]=useState("");
   const set=(k,v)=>setForm(f=>({...f,[k]:v}));
   const doSave=()=>{
     if(!form.name.trim()){alert("Please enter an apiary name");return;}
     if(!form.location.trim()){alert("Please enter a location");return;}
     onComplete({...form});
+  };
+  const handleFileRead=e=>{
+    const file=e.target.files?.[0]; if(!file) return;
+    setImportStatus("reading");
+    const reader=new FileReader();
+    reader.onload=ev=>{
+      try{
+        const data=JSON.parse(ev.target.result);
+        if(!data.hives||!data.apiaries) throw new Error("Invalid BeeMark backup file.");
+        onImportBackup&&onImportBackup(data);
+      } catch(err){ setImportStatus("error: "+err.message); }
+    };
+    reader.onerror=()=>setImportStatus("error: Could not read file");
+    reader.readAsText(file);
+    e.target.value="";
   };
   return (
     <div style={{ minHeight:"100vh",display:"flex",flexDirection:"column",justifyContent:"center",padding:24,background:`linear-gradient(160deg,${C.primaryLight} 0%,${C.bg} 50%,${C.surface} 100%)` }}>
@@ -500,6 +516,32 @@ const ApiarySetup = ({ onComplete, isAdding=false, onCancel, allApiaries=[] }) =
             <Icon name="check" size={18} color="#fff"/> {isAdding?"Save Apiary":"Create Apiary"}
           </Btn>
         </div>
+        {!isAdding&&(
+          <div style={{ marginTop:28 }}>
+            <div style={{ display:"flex",alignItems:"center",gap:10,marginBottom:14 }}>
+              <div style={{ flex:1,height:1,background:C.border }}/>
+              <span style={{ fontSize:13,color:C.textMuted,fontWeight:600 }}>Already a BeeMark User?</span>
+              <div style={{ flex:1,height:1,background:C.border }}/>
+            </div>
+            <Card style={{ background:"rgba(255,255,255,.92)" }}>
+              <div style={{ fontWeight:700,color:C.textPrimary,fontSize:15,marginBottom:6 }}>Import Backup File</div>
+              <div style={{ fontSize:13,color:C.textSecondary,lineHeight:1.6,marginBottom:14 }}>
+                Restore all your hives, apiaries, inspections and settings from a previous BeeMark backup.
+              </div>
+              {importStatus&&importStatus!=="reading"&&(
+                <div style={{ fontSize:13,color:importStatus.startsWith("error")?C.red:C.primary,marginBottom:10,padding:"8px 10px",background:`rgba(${hexToRgb(importStatus.startsWith("error")?C.red:C.primary)},.08)`,borderRadius:8 }}>
+                  {importStatus.startsWith("error")?("⚠ "+importStatus.replace("error: ","")):("✓ Backup loaded, restoring…")}
+                </div>
+              )}
+              <label style={{ display:"block",cursor:"pointer" }}>
+                <input type="file" accept=".json,application/json" onChange={handleFileRead} style={{ display:"none" }}/>
+                <div style={{ display:"flex",alignItems:"center",justifyContent:"center",gap:8,background:C.accent,color:"#fff",borderRadius:10,padding:"12px 16px",fontWeight:700,fontSize:15 }}>
+                  <Icon name="plus" size={18} color="#fff"/> Choose Backup File
+                </div>
+              </label>
+            </Card>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -1383,6 +1425,26 @@ const CombineHiveFields = ({ act, ai, actions, setActions, hives, currentHiveId 
   );
 };
 
+// ── Transfer to New Hive sub-form ───────────────────────────────────────────
+const TransferToNewHiveFields = ({ act, ai, actions, setActions }) => {
+  const upd=(k,v)=>{ const a=[...actions]; a[ai]={...a[ai],[k]:v}; setActions(a); };
+  return (
+    <div>
+      <Field label="Transfer To">
+        <DDSelect value={act.transfer_hive_type||""} onChange={v=>upd("transfer_hive_type",v)}
+          options={["Full-Sized Hive","Nuc"]} placeholder="Select destination type..."/>
+      </Field>
+      <div style={{ fontSize:13,color:C.textMuted,background:"rgba(0,0,0,.04)",borderRadius:8,padding:"8px 10px",marginBottom:8,lineHeight:1.5 }}>
+        {act.transfer_hive_type==="Nuc"
+          ? "This hive will become a Nuc: full hive equipment returns to the shed, a Nuc slot is assigned."
+          : act.transfer_hive_type==="Full-Sized Hive"
+          ? "This Nuc will become a full-sized hive: nuc slot returns to shed, full hive equipment assigned."
+          : "Select destination type above."}
+      </div>
+    </div>
+  );
+};
+
 // ── Weight Log (winter / non-inspection weight record) ─────────────────────
 const WeightLog = ({ hive, onSave, onNavigate, existing }) => {
   const [form,setForm]=useState(existing?{weight_kg:existing.weight_kg||"",date:existing.date||TODAY,notes:existing.notes||""}:{weight_kg:"",date:TODAY,notes:""});
@@ -1583,6 +1645,9 @@ const InspectionForm = ({ hive, existing, onSave, onNavigate, onMarkTreatmentCom
               )}
               {act.type==="Sold/Given Away"&&(
                 <SoldGivenAwayFields act={act} ai={ai} actions={form.actions} setActions={v=>set("actions",v)}/>
+              )}
+              {act.type==="Transfer to New Hive"&&(
+                <TransferToNewHiveFields act={act} ai={ai} actions={form.actions} setActions={v=>set("actions",v)}/>
               )}
               <Field label="Details" style={{ marginBottom:0 }}>
                 <textarea value={act.details} onChange={e=>{ const a=[...form.actions]; a[ai]={...a[ai],details:e.target.value}; set("actions",a); }} placeholder="Describe the action..." style={{...inputBase,minHeight:60,resize:"vertical"}}/>
@@ -1788,6 +1853,7 @@ const ActionForm = ({ hive, onSave, onNavigate, apiaries=[], hives=[], onMoveHiv
           {form.type==="Move Hive"&&<MoveHiveFields act={form} ai={0} actions={[form]} setActions={arr=>setForm(arr[0])} apiaries={apiaries} currentApiaryId={hive.apiaryId}/>}
           {form.type==="Sold/Given Away"&&<SoldGivenAwayFields act={form} ai={0} actions={[form]} setActions={arr=>setForm(arr[0])}/>}
           {form.type==="Combine Hive"&&<CombineHiveFields act={form} ai={0} actions={[form]} setActions={arr=>setForm(arr[0])} hives={hives} currentHiveId={hive.id}/>}
+          {form.type==="Transfer to New Hive"&&<TransferToNewHiveFields act={form} ai={0} actions={[form]} setActions={arr=>setForm(arr[0])}/>}
           <Field label="Details" style={{ marginBottom:0 }}><textarea value={form.details} onChange={e=>set("details",e.target.value)} placeholder="Describe what was done..." style={{...inputBase,minHeight:100,resize:"vertical"}}/></Field>
         </Card>
         <Btn onClick={doSave} style={{ width:"100%",justifyContent:"center" }}><Icon name="check" size={17} color="#fff"/> Save Action</Btn>
@@ -1805,13 +1871,16 @@ const EquipmentShed = ({ hives, onBack, manualCounts, onSetManual }) => {
   const nonNucHives  = activeHives.filter(h=>!h.isNuc);
   const nucHives     = activeHives.filter(h=>h.isNuc);
   const broodBoxesInUse = activeHives.reduce((s,h)=>s+Number(h.boxes||1),0);
+  // Supers in use: count actual supers on non-nuc hives; brood-as-super hives
+  // do NOT contribute to supers count (the brood box is counted above instead)
   const supersInUse     = nonNucHives.reduce((s,h)=>h.useBroodAsSuper?s:s+Number(h.supers||0),0);
   const queenExcludersInUse = activeHives.filter(h=>!!h.queen_excluder).length;
   const nucsInUse       = nucHives.length;
-  const feedersInUse    = nonNucHives.filter(h=>hasActiveFeeder(h)).length;
-  const roofsInUse      = nonNucHives.length;
-  const floorsInUse     = nonNucHives.length;
-  const crownBoardsInUse = nonNucHives.length;
+  // Feeders: any active feeder hive (nuc or non-nuc)
+  const feedersInUse    = activeHives.filter(h=>hasActiveFeeder(h)).length;
+  const roofsInUse      = activeHives.length;
+  const floorsInUse     = activeHives.length;
+  const crownBoardsInUse = activeHives.length;
 
   const items = [
     {key:"broodBoxes",    label:"Brood Boxes",     inUse:broodBoxesInUse,     total:manualCounts.broodBoxes_total},
@@ -2538,7 +2607,7 @@ export default function App() {
   if(!apiaries||apiaries.length===0){
     return (
       <div style={{ fontFamily:"'Roboto',sans-serif",maxWidth:480,margin:"0 auto",boxShadow:"0 0 40px rgba(0,0,0,.12)",minHeight:"100vh" }}>
-        <ApiarySetup onComplete={a=>{ setApiaries([a]); setActiveApiaryId(a.id); }}/>
+        <ApiarySetup onComplete={a=>{ setApiaries([a]); setActiveApiaryId(a.id); }} onImportBackup={d=>{ setHives(d.hives||[]); setApiaries(d.apiaries||[]); const rid=d.activeApiaryId&&(d.apiaries||[]).find(a=>a.id===d.activeApiaryId)?d.activeApiaryId:(d.apiaries?.[0]?.id||null); setActiveApiaryId(rid); if(d.equipManual) setEquipManual(d.equipManual); }}/>
       </div>
     );
   }
@@ -2599,7 +2668,25 @@ export default function App() {
     setHives(hs=>hs.find(h=>h.id===withQE.id)?hs.map(h=>h.id===withQE.id?withQE:h):[...hs,withQE]);
   };
   const deleteHive=id=>{ setHives(hs=>hs.filter(h=>h.id!==id)); navigate("hives"); };
-  const archiveHive=id=>setHives(hs=>hs.map(h=>h.id===id?{...h,status:"Archived",archivedAt:TODAY}:h));
+  const archiveHive=id=>{
+    const hive=hives.find(h=>h.id===id);
+    if(hive){
+      // Return equipment to shed totals when archiving
+      const boxes=Number(hive.boxes||1);
+      const supers=hive.useBroodAsSuper?0:Number(hive.supers||0);
+      const hasQE=!!hive.queen_excluder;
+      const hasFeeder=hasActiveFeeder(hive);
+      setEquipManual(m=>({
+        ...m,
+        broodBoxes_total: Math.max(0,(m.broodBoxes_total||0)),  // in-use is recalculated, no change to total needed
+        // We increment totals: archived hive's equipment becomes "spare"
+        // Actually: totals stay the same — in-use drops automatically because
+        // archived hives are excluded. So no changes needed to totals.
+        // Exception: if hive is a Nuc, the nuc slot returns to spare automatically.
+      }));
+    }
+    setHives(hs=>hs.map(h=>h.id===id?{...h,status:"Archived",archivedAt:TODAY}:h));
+  };
   const restoreHive=id=>setHives(hs=>hs.map(h=>h.id===id?{...h,status:"",archivedAt:null}:h));
 
   // Helper: compute updated supers/boxes from an action record
@@ -2613,6 +2700,10 @@ export default function App() {
     if(actionType==="Removed Super"){  const s=Math.max(0,(Number(h.supers)||0)-n); return applyQE({...h,supers:s},s); }
     if(actionType==="Added Brood Box")   return {...h, boxes:Math.max(1,(Number(h.boxes)||1)+1)};
     if(actionType==="Removed Brood Box") return {...h, boxes:Math.max(1,(Number(h.boxes)||1)-1)};
+    if(actionType==="Transfer to New Hive"){
+      // Convert hive type. transfer_hive_type stored in act object, passed as qty string here.
+      // We handle it in the save action callbacks below instead, as we need the full act object.
+    }
     return h;
   };
 
@@ -2657,6 +2748,13 @@ export default function App() {
               if(act.type==="Move Hive"&&moveTarget) hiveUpdate={...hiveUpdate,apiaryId:moveTarget};
               // Sold/given away → archive with transfer info
               if(act.type==="Sold/Given Away"&&soldDetails) hiveUpdate={...hiveUpdate,status:"Archived",archivedAt:ins.date,transferred_to:soldDetails.transferred_to,transfer_notes:soldDetails.transfer_notes};
+              // Transfer to New Hive → convert hive type
+              if(act.type==="Transfer to New Hive"){
+                const toNuc=act.transfer_hive_type==="Nuc";
+                const toFull=act.transfer_hive_type==="Full-Sized Hive";
+                if(toNuc) hiveUpdate={...hiveUpdate,isNuc:true,useBroodAsSuper:false,boxes:1,supers:0,queen_excluder:false};
+                else if(toFull) hiveUpdate={...hiveUpdate,isNuc:false,supers:0,queen_excluder:false};
+              }
             }
           });
         }
@@ -2754,15 +2852,38 @@ export default function App() {
     setHives(hs=>hs.map(h=>h.id===hiveId?{...h,apiaryId:targetId,interventions:[...(h.interventions||[]),{id:uid(),type:"Move Hive",qty:"1",details:form.details||"",date:form.date||TODAY,source:"manual"}]}:h));
   };
   const soldHive=(hiveId,form)=>{
+    if(form.type==="Transfer to New Hive"){
+      // Convert hive between Nuc and Full-Sized Hive
+      const toNuc=form.transfer_hive_type==="Nuc";
+      const toFull=form.transfer_hive_type==="Full-Sized Hive";
+      setHives(hs=>hs.map(h=>{
+        if(h.id!==hiveId) return h;
+        const logEntry={id:uid(),type:"Transfer to New Hive",qty:"1",details:form.details||(toNuc?"Transferred to Nuc":"Transferred to full-sized hive"),transfer_hive_type:form.transfer_hive_type,date:form.date||TODAY,source:"manual"};
+        if(toNuc){
+          // Full hive → Nuc: turn off useBroodAsSuper, set isNuc true, reset to 1 box, 0 supers, no QE
+          return {...h,isNuc:true,useBroodAsSuper:false,boxes:1,supers:0,queen_excluder:false,interventions:[...(h.interventions||[]),logEntry]};
+        } else if(toFull){
+          // Nuc → Full: turn off isNuc, ensure 1 box, 0 supers, no QE (user can add manually)
+          return {...h,isNuc:false,boxes:Math.max(1,Number(h.boxes)||1),supers:0,queen_excluder:false,interventions:[...(h.interventions||[]),logEntry]};
+        }
+        return h;
+      }));
+      navigate("hive-detail",{hiveId});
+      return;
+    }
     setHives(hs=>hs.map(h=>h.id===hiveId?{...h,status:"Archived",archivedAt:form.date||TODAY,transferred_to:form.transferred_to||"",transfer_notes:form.transfer_notes||form.details||"",interventions:[...(h.interventions||[]),{id:uid(),type:"Sold/Given Away",qty:"1",details:form.details||"",date:form.date||TODAY,source:"manual"}]}:h));
   };
   const combineHive=(hiveId,form)=>{
     const targetHive=hives.find(h=>h.id===form.combine_target_id);
-    if(!targetHive) return;
-    // Archive the current hive with a log entry
+    const sourceHive=hives.find(h=>h.id===hiveId);
+    if(!targetHive||!sourceHive) return;
+    // Merge equipment: target hive gets combined boxes and supers
+    const mergedBoxes=Math.max(1,(Number(targetHive.boxes)||1)+(Number(sourceHive.boxes)||1));
+    const mergedSupers=(Number(targetHive.supers)||0)+(sourceHive.useBroodAsSuper?0:Number(sourceHive.supers)||0);
+    const hasQE=mergedSupers>0;
     setHives(hs=>hs.map(h=>{
       if(h.id===hiveId) return {...h,status:"Archived",archivedAt:form.date||TODAY,transfer_notes:form.details||"",interventions:[...(h.interventions||[]),{id:uid(),type:"Combine Hive",qty:"1",details:form.details||"",combine_target_id:form.combine_target_id,combine_target_name:targetHive.name,date:form.date||TODAY,source:"manual"}]};
-      if(h.id===form.combine_target_id) return {...h,interventions:[...(h.interventions||[]),{id:uid(),type:"Combine Hive",qty:"1",details:`Hive "${h.name}" was combined into this hive.${form.details?" "+form.details:""}`,combined_from_id:hiveId,combined_from_name:hs.find(x=>x.id===hiveId)?.name||"",date:form.date||TODAY,source:"manual"}]};
+      if(h.id===form.combine_target_id) return {...h,boxes:mergedBoxes,supers:mergedSupers,queen_excluder:hasQE,interventions:[...(h.interventions||[]),{id:uid(),type:"Combine Hive",qty:"1",details:`Hive "${sourceHive.name}" was combined into this hive.${form.details?" "+form.details:""}`,combined_from_id:hiveId,combined_from_name:sourceHive.name,date:form.date||TODAY,source:"manual"}]};
       return h;
     }));
   };
