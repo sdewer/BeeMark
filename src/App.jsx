@@ -1746,7 +1746,7 @@ const TreatmentForm = ({ hive, onSave, onNavigate }) => {
 };
 
 // ── Action Form ────────────────────────────────────────────────────────────
-const ActionForm = ({ hive, onSave, onNavigate, apiaries=[], hives=[], onMoveHive, onSoldHive, onCombineHive }) => {
+const ActionForm = ({ hive, onSave, onNavigate, apiaries=[], hives=[], onMoveHive, onSoldHive, onCombineHive, onFrameEggsAction }) => {
   const [form,setForm]=useState({type:"",qty:"1",details:"",date:TODAY});
   const set=(k,v)=>setForm(f=>({...f,[k]:v}));
   const doSave=()=>{
@@ -1764,6 +1764,16 @@ const ActionForm = ({ hive, onSave, onNavigate, apiaries=[], hives=[], onMoveHiv
     if(form.type==="Sold/Given Away"){
       onSoldHive&&onSoldHive(hive.id,form);
       onNavigate("hives"); return;
+    }
+    if(form.type==="Frame of Eggs Removed"){
+      if(!form.eggs_transfer_hive_id&&!form.eggs_transfer_external){alert("Select the destination hive or choose 'Outside Apiary'");return;}
+      onFrameEggsAction&&onFrameEggsAction(hive.id,form,"removed");
+      onNavigate("hive-detail",{hiveId:hive.id}); return;
+    }
+    if(form.type==="Frame of Eggs Added"){
+      if(!form.eggs_source_hive_id&&!form.eggs_source_external){alert("Select the source hive or choose 'Outside Apiary'");return;}
+      onFrameEggsAction&&onFrameEggsAction(hive.id,form,"added");
+      onNavigate("hive-detail",{hiveId:hive.id}); return;
     }
     onSave(hive.id,{...form,id:uid(),source:"manual",qty:form.qty||"1"},"intervention");
     onNavigate("hive-detail",{hiveId:hive.id});
@@ -1788,6 +1798,28 @@ const ActionForm = ({ hive, onSave, onNavigate, apiaries=[], hives=[], onMoveHiv
           {form.type==="Move Hive"&&<MoveHiveFields act={form} ai={0} actions={[form]} setActions={arr=>setForm(arr[0])} apiaries={apiaries} currentApiaryId={hive.apiaryId}/>}
           {form.type==="Sold/Given Away"&&<SoldGivenAwayFields act={form} ai={0} actions={[form]} setActions={arr=>setForm(arr[0])}/>}
           {form.type==="Combine Hive"&&<CombineHiveFields act={form} ai={0} actions={[form]} setActions={arr=>setForm(arr[0])} hives={hives} currentHiveId={hive.id}/>}
+          {form.type==="Frame of Eggs Removed"&&(
+            <div style={{ marginBottom:10 }}>
+              <Field label="Transferred to">
+                <DDSelect value={form.eggs_transfer_hive_id||""} onChange={v=>{ set("eggs_transfer_hive_id",v==="__external__"?"":v); set("eggs_transfer_external",v==="__external__"); }}
+                  options={[{label:"Outside Apiary",value:"__external__"},...hives.filter(h=>h.id!==hive.id&&h.status!=="Archived").map(h=>({label:h.name,value:h.id}))]}
+                  placeholder="Select destination..."/>
+              </Field>
+              {form.eggs_transfer_external&&<div style={{ fontSize:13,color:C.textMuted,marginBottom:6,padding:"6px 10px",background:"rgba(0,0,0,.04)",borderRadius:8 }}>Frame transferred to a hive outside this apiary — only this hive will be logged.</div>}
+              {form.eggs_transfer_hive_id&&hives.find(h=>h.id===form.eggs_transfer_hive_id)&&<div style={{ fontSize:13,color:C.accent,marginBottom:6,padding:"6px 10px",background:`rgba(59,158,232,.07)`,borderRadius:8 }}>A "Frame of Eggs Added" action will also be logged in {hives.find(h=>h.id===form.eggs_transfer_hive_id).name}.</div>}
+            </div>
+          )}
+          {form.type==="Frame of Eggs Added"&&(
+            <div style={{ marginBottom:10 }}>
+              <Field label="Received from">
+                <DDSelect value={form.eggs_source_hive_id||""} onChange={v=>{ set("eggs_source_hive_id",v==="__external__"?"":v); set("eggs_source_external",v==="__external__"); }}
+                  options={[{label:"Outside Apiary",value:"__external__"},...hives.filter(h=>h.id!==hive.id&&h.status!=="Archived").map(h=>({label:h.name,value:h.id}))]}
+                  placeholder="Select source..."/>
+              </Field>
+              {form.eggs_source_external&&<div style={{ fontSize:13,color:C.textMuted,marginBottom:6,padding:"6px 10px",background:"rgba(0,0,0,.04)",borderRadius:8 }}>Frame received from a hive outside this apiary — only this hive will be logged.</div>}
+              {form.eggs_source_hive_id&&hives.find(h=>h.id===form.eggs_source_hive_id)&&<div style={{ fontSize:13,color:C.accent,marginBottom:6,padding:"6px 10px",background:`rgba(59,158,232,.07)`,borderRadius:8 }}>A "Frame of Eggs Removed" action will also be logged in {hives.find(h=>h.id===form.eggs_source_hive_id).name}.</div>}
+            </div>
+          )}
           <Field label="Details" style={{ marginBottom:0 }}><textarea value={form.details} onChange={e=>set("details",e.target.value)} placeholder="Describe what was done..." style={{...inputBase,minHeight:100,resize:"vertical"}}/></Field>
         </Card>
         <Btn onClick={doSave} style={{ width:"100%",justifyContent:"center" }}><Icon name="check" size={17} color="#fff"/> Save Action</Btn>
@@ -1890,6 +1922,7 @@ const AboutPage = ({ onBack }) => (
     <div style={{ padding:24 }}>
       <div style={{ display:"flex",justifyContent:"center",marginBottom:32 }}>
         <img src={LOGO_B64} alt="BeeMark" style={{ width:220,maxWidth:"85%" }}/>
+        <div style={{ textAlign:"center",marginTop:8,fontSize:14,fontWeight:600,color:C.textMuted,letterSpacing:1 }}>{APP_DISPLAY_VERSION}</div>
       </div>
       <Card style={{ marginBottom:16,background:C.surfaceAlt }}>
         <div style={{ fontSize:17,color:C.textPrimary,lineHeight:1.8,textAlign:"center",padding:"4px 0" }}>
@@ -2167,6 +2200,7 @@ const BeekeeperInfo = ({ onBack }) => {
 // ── Data Transfer Page ──────────────────────────────────────────────────────
 // APP_VERSION bumped here whenever the data schema changes — exported files carry it
 const APP_VERSION = 4;
+const APP_DISPLAY_VERSION = "v1.2.2";
 
 const DataTransfer = ({ hives, apiaries, activeApiaryId, equipManual, onImport, onBack }) => {
   const [importStatus,setImportStatus]=useState("");
@@ -2398,7 +2432,7 @@ const InfoHub = ({ hives, apiaries, onNavigate }) => {
     { id:"equipment-shed", label:"Equipment Shed",    description:"Track your brood boxes, supers, feeders and more",         icon:"shed",    color:C.primary },
     { id:"beekeeper-info", label:"Beekeeper Resources", description:"Queen marking chart, bee lifecycle and UK pollen guide",  icon:"queen",   color:C.orange  },
     { id:"data-transfer",  label:"Import / Export",   description:"Back up your hive data or move it to another device",      icon:"hive",    color:C.accent  },
-    { id:"about-page",     label:"About BeeMark",     description:"A word from the creator",                                  icon:"check",   color:C.green   },
+    { id:"about-page",     label:"About BeeMark",     description:"A word from the creator",                                  icon:"check",   color:"#7B4FC8" },
   ];
   return (
     <PageWrap>
@@ -2777,6 +2811,21 @@ export default function App() {
       return h;
     }));
   };
+  const frameEggsAction=(hiveId,form,direction)=>{
+    const thisRecord={id:uid(),type:direction==="removed"?"Frame of Eggs Removed":"Frame of Eggs Added",qty:"1",details:form.details||"",date:form.date||TODAY,source:"manual",
+      ...(direction==="removed"?{eggs_transfer_hive_id:form.eggs_transfer_hive_id||"",eggs_transfer_external:form.eggs_transfer_external||false}:{eggs_source_hive_id:form.eggs_source_hive_id||"",eggs_source_external:form.eggs_source_external||false})};
+    const otherHiveId=direction==="removed"?form.eggs_transfer_hive_id:form.eggs_source_hive_id;
+    const otherHive=otherHiveId?hives.find(h=>h.id===otherHiveId):null;
+    const otherRecord=otherHive?{id:uid(),type:direction==="removed"?"Frame of Eggs Added":"Frame of Eggs Removed",qty:"1",
+      details:`Frame ${direction==="removed"?"received from":"sent to"} ${hives.find(h=>h.id===hiveId)?.name||"another hive"}${form.details?" — "+form.details:""}`,
+      date:form.date||TODAY,source:"manual",
+      ...(direction==="removed"?{eggs_source_hive_id:hiveId,eggs_source_external:false}:{eggs_transfer_hive_id:hiveId,eggs_transfer_external:false})}:null;
+    setHives(hs=>hs.map(h=>{
+      if(h.id===hiveId) return {...h,interventions:[...(h.interventions||[]),thisRecord]};
+      if(otherRecord&&h.id===otherHiveId) return {...h,interventions:[...(h.interventions||[]),otherRecord]};
+      return h;
+    }));
+  };
   const saveApiary=updated=>setApiaries(as=>as.map(a=>a.id===updated.id?updated:a));
   const addApiary=a=>{ setApiaries(as=>[...as,a]); setActiveApiaryId(a.id); };
   const deleteApiary=id=>{ const rem=apiaries.filter(a=>a.id!==id); setApiaries(rem); setHives(hs=>hs.filter(h=>h.apiaryId!==id)); if(rem.length>0) setActiveApiaryId(rem[0].id); };
@@ -2828,7 +2877,7 @@ export default function App() {
     onBack={()=>navigate("info-hub")}/>
   else if(screen==="about-page")      content=<AboutPage onBack={()=>navigate("info-hub")}/>;
   else if(screen==="add-treatment")   { const h=getHive(params.hiveId); if(h) content=<TreatmentForm hive={h} onSave={saveExtra} onNavigate={navigate}/>; }
-  else if(screen==="add-intervention"){ const h=getHive(params.hiveId); if(h) content=<ActionForm    hive={h} onSave={saveExtra} onNavigate={navigate} apiaries={apiaries||[]} hives={hives||[]} onMoveHive={moveHive} onSoldHive={soldHive} onCombineHive={combineHive}/>; }
+  else if(screen==="add-intervention"){ const h=getHive(params.hiveId); if(h) content=<ActionForm    hive={h} onSave={saveExtra} onNavigate={navigate} apiaries={apiaries||[]} hives={hives||[]} onMoveHive={moveHive} onSoldHive={soldHive} onCombineHive={combineHive} onFrameEggsAction={frameEggsAction}/>; }
   if(!content) content=<HiveList hives={hives} apiaries={apiaries} activeApiaryId={activeApiaryId||currentApiaryId} onSelectApiary={setActiveApiaryId} onNavigate={navigate} customOrder={hiveOrder} onReorder={setHiveOrder}/>;
 
   if(!dbReady) return (
