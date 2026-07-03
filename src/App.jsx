@@ -458,7 +458,7 @@ const InspectionSummaryBar = ({ ins }) => {
 };
 
 // ── Apiary Setup (first-run + add new) ────────────────────────────────────
-const ApiarySetup = ({ onComplete, isAdding=false, onCancel, allApiaries=[] }) => {
+const ApiarySetup = ({ onComplete, isAdding=false, onCancel, allApiaries=[], onRestoreBackup }) => {
   const [form,setForm]=useState(()=>{
     const usedColors=allApiaries.map(a=>a.color).filter(Boolean);
     return {id:uid(),name:"",location:"",notes:"",beebase_id:"",color:nextColor(usedColors)};
@@ -469,12 +469,48 @@ const ApiarySetup = ({ onComplete, isAdding=false, onCancel, allApiaries=[] }) =
     if(!form.location.trim()){alert("Please enter a location");return;}
     onComplete({...form});
   };
+
+  // ── Restore-from-backup (first-run only) ──
+  const [restoring,setRestoring]=useState(false);
+  const [restoreError,setRestoreError]=useState("");
+  const [restorePreview,setRestorePreview]=useState(null);
+
+  const handleRestoreFile = e => {
+    const file=e.target.files?.[0];
+    if(!file) return;
+    setRestoring(true);
+    setRestoreError("");
+    setRestorePreview(null);
+    const reader=new FileReader();
+    reader.onload=ev=>{
+      try{
+        const data=JSON.parse(ev.target.result);
+        if(!data.hives||!data.apiaries) throw new Error("Invalid BeeMark backup file — missing hives or apiaries data.");
+        setRestorePreview(data);
+      }catch(err){
+        setRestoreError("error: "+err.message);
+      }
+      setRestoring(false);
+    };
+    reader.onerror=()=>{ setRestoreError("error: Could not read file"); setRestoring(false); };
+    reader.readAsText(file);
+    e.target.value="";
+  };
+
+  const doRestore = () => {
+    if(!restorePreview) return;
+    onRestoreBackup(restorePreview);
+  };
+
+  const previewActiveHives   = restorePreview?.hives?.filter(h=>h.status!=="Archived") || [];
+  const previewArchivedHives = restorePreview?.hives?.filter(h=>h.status==="Archived")  || [];
+
   return (
     <div style={{ minHeight:"100vh",display:"flex",flexDirection:"column",justifyContent:"center",padding:24,background:`linear-gradient(160deg,${C.primaryLight} 0%,${C.bg} 50%,${C.surface} 100%)` }}>
       <HexBg opacity={0.06}/>
       <div style={{ position:"relative",zIndex:1,maxWidth:420,margin:"0 auto",width:"100%" }}>
         {!isAdding?(
-          <div style={{ textAlign:"center",marginBottom:40,display:"flex",flexDirection:"column",alignItems:"center" }}>
+          <div style={{ textAlign:"center",marginBottom:isAdding?32:24,display:"flex",flexDirection:"column",alignItems:"center" }}>
             <img src={LOGO_B64} alt="BeeMark" style={{ width:200,maxWidth:"80%",marginBottom:20,display:"block",marginLeft:"auto",marginRight:"auto" }}/>
             <div style={{ fontSize:17,color:C.textSecondary,lineHeight:1.6 }}>Set up your first apiary to get started.</div>
           </div>
@@ -485,21 +521,81 @@ const ApiarySetup = ({ onComplete, isAdding=false, onCancel, allApiaries=[] }) =
             <div style={{ fontSize:15,color:C.textMuted,marginTop:4 }}>Create a new apiary location.</div>
           </div>
         )}
-        <Card style={{ marginBottom:16,background:"rgba(255,255,255,.92)" }}>
-          <div style={{ fontWeight:700,color:C.textPrimary,marginBottom:16,fontSize:17 }}>Apiary Details</div>
-          <Field label="Apiary Name *"><Input value={form.name} onChange={v=>set("name",v)} placeholder="e.g. Meadow Apiary"/></Field>
-          <Field label="Location *"><Input value={form.location} onChange={v=>set("location",v)} placeholder="e.g. Back Garden"/></Field>
-          <Field label="BeeBase Apiary ID"><Input value={form.beebase_id||""} onChange={v=>set("beebase_id",v)} placeholder="e.g. GB-1234567"/></Field>
-          <Field label="Notes" style={{ marginBottom:0 }}>
-            <textarea value={form.notes} onChange={e=>set("notes",e.target.value)} placeholder="Any notes about the site..." style={{...inputBase,minHeight:70,resize:"vertical"}}/>
-          </Field>
-        </Card>
-        <div style={{ display:"flex",gap:10 }}>
-          {isAdding&&<Btn onClick={onCancel} variant="ghost" style={{ flex:1,justifyContent:"center" }}>Cancel</Btn>}
-          <Btn onClick={doSave} style={{ flex:1,justifyContent:"center",padding:15 }}>
-            <Icon name="check" size={18} color="#fff"/> {isAdding?"Save Apiary":"Create Apiary"}
-          </Btn>
-        </div>
+
+        {!isAdding&&!restorePreview&&(
+          <Card style={{ marginBottom:16,background:"rgba(255,255,255,.92)" }}>
+            <label style={{ display:"block" }}>
+              <div style={{ width:"100%",background:`linear-gradient(135deg,${C.accent},#1565C0)`,color:"#fff",borderRadius:10,padding:"13px 22px",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:6,fontFamily:"'Roboto',sans-serif",fontWeight:600,fontSize:16,boxSizing:"border-box" }}>
+                <Icon name="restore" color="#fff" size={17}/> {restoring?"Reading file...":"Already a user? Upload Backup File"}
+              </div>
+              <input type="file" accept=".json" onChange={handleRestoreFile} style={{ display:"none" }}/>
+            </label>
+            {restoreError&&(
+              <div style={{ marginTop:10,padding:"10px 14px",background:`rgba(${hexToRgb(C.red)},.08)`,border:`1.5px solid ${C.red}`,borderRadius:10,fontSize:14,color:C.red }}>
+                {restoreError}
+              </div>
+            )}
+            <div style={{ display:"flex",alignItems:"center",gap:10,margin:"14px 0" }}>
+              <div style={{ flex:1,height:1,background:C.border }}/>
+              <div style={{ fontSize:13,color:C.textMuted,fontWeight:700,letterSpacing:0.5 }}>OR</div>
+              <div style={{ flex:1,height:1,background:C.border }}/>
+            </div>
+            <div style={{ textAlign:"center",fontSize:15,color:C.textSecondary,lineHeight:1.5 }}>New user? Create your first apiary below.</div>
+          </Card>
+        )}
+
+        {!isAdding&&restorePreview&&(
+          <Card style={{ marginBottom:16,background:"rgba(255,255,255,.92)" }}>
+            <div style={{ fontWeight:700,color:C.textPrimary,fontSize:17,marginBottom:10 }}>Confirm Restore</div>
+            <div style={{ fontSize:14,color:C.textSecondary,marginBottom:10,lineHeight:1.6 }}>This backup contains:</div>
+            <div style={{ display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:6,marginBottom:14 }}>
+              {[
+                {label:"Active Hives",   value:previewActiveHives.length,    color:C.primary},
+                {label:"Archived Hives", value:previewArchivedHives.length,   color:C.textMuted},
+                {label:"Apiaries",       value:restorePreview.apiaries?.length||0, color:C.accent},
+                {label:"Inspections",    value:(restorePreview._summary?.inspections??restorePreview.hives?.reduce((s,h)=>s+h.inspections.length,0)), color:C.orange},
+                {label:"Treatments",     value:(restorePreview._summary?.treatments??restorePreview.hives?.reduce((s,h)=>s+h.treatments.length,0)), color:C.blue},
+                {label:"Actions",        value:(restorePreview._summary?.actions??restorePreview.hives?.reduce((s,h)=>s+(h.interventions||[]).length,0)), color:C.green},
+              ].map(s=>(
+                <div key={s.label} style={{ background:C.bg,borderRadius:8,padding:"8px 6px",textAlign:"center",border:`1px solid ${C.border}` }}>
+                  <div style={{ fontSize:11,color:C.textMuted,textTransform:"uppercase",letterSpacing:0.6,fontWeight:700,marginBottom:2 }}>{s.label}</div>
+                  <div style={{ fontSize:18,fontWeight:700,color:s.color }}>{s.value}</div>
+                </div>
+              ))}
+            </div>
+            {restorePreview.exportedAt&&(
+              <div style={{ fontSize:13,color:C.textMuted,marginBottom:12 }}>
+                Exported: {new Date(restorePreview.exportedAt).toLocaleDateString("en-GB",{day:"numeric",month:"short",year:"numeric",hour:"2-digit",minute:"2-digit"})}
+              </div>
+            )}
+            <div style={{ display:"flex",gap:10 }}>
+              <Btn onClick={()=>setRestorePreview(null)} variant="ghost" style={{ flex:1,justifyContent:"center" }}>Cancel</Btn>
+              <Btn onClick={doRestore} style={{ flex:1,justifyContent:"center" }}>
+                <Icon name="restore" size={15} color="#fff"/> Confirm Restore
+              </Btn>
+            </div>
+          </Card>
+        )}
+
+        {!restorePreview&&(
+          <>
+            <Card style={{ marginBottom:16,background:"rgba(255,255,255,.92)" }}>
+              <div style={{ fontWeight:700,color:C.textPrimary,marginBottom:16,fontSize:17 }}>Apiary Details</div>
+              <Field label="Apiary Name *"><Input value={form.name} onChange={v=>set("name",v)} placeholder="e.g. Meadow Apiary"/></Field>
+              <Field label="Location *"><Input value={form.location} onChange={v=>set("location",v)} placeholder="e.g. Back Garden"/></Field>
+              <Field label="BeeBase Apiary ID"><Input value={form.beebase_id||""} onChange={v=>set("beebase_id",v)} placeholder="e.g. GB-1234567"/></Field>
+              <Field label="Notes" style={{ marginBottom:0 }}>
+                <textarea value={form.notes} onChange={e=>set("notes",e.target.value)} placeholder="Any notes about the site..." style={{...inputBase,minHeight:70,resize:"vertical"}}/>
+              </Field>
+            </Card>
+            <div style={{ display:"flex",gap:10 }}>
+              {isAdding&&<Btn onClick={onCancel} variant="ghost" style={{ flex:1,justifyContent:"center" }}>Cancel</Btn>}
+              <Btn onClick={doSave} style={{ flex:1,justifyContent:"center",padding:15 }}>
+                <Icon name="check" size={18} color="#fff"/> {isAdding?"Save Apiary":"Create Apiary"}
+              </Btn>
+            </div>
+          </>
+        )}
       </div>
     </div>
   );
@@ -507,9 +603,11 @@ const ApiarySetup = ({ onComplete, isAdding=false, onCancel, allApiaries=[] }) =
 
 // Palette for auto-assigning colours to new hives/apiaries
 const COLOR_PALETTE = ["#2DBD8F","#3B9EE8","#E53935","#F57C00","#8E24AA","#00897B","#43A047","#0288D1","#E91E63","#FF6F00","#1565C0","#558B2F"];
-const nextColor = (usedColors) => {
+// Hive colour tags support an additional yellow option (not used for apiaries)
+const HIVE_COLOR_PALETTE = [...COLOR_PALETTE, "#FDD835"];
+const nextColor = (usedColors, palette=COLOR_PALETTE) => {
   const used = new Set(usedColors);
-  const unused=COLOR_PALETTE.find(c=>!used.has(c)); if(unused) return unused; return COLOR_PALETTE[usedColors.length%COLOR_PALETTE.length]||COLOR_PALETTE[0];
+  const unused=palette.find(c=>!used.has(c)); if(unused) return unused; return palette[usedColors.length%palette.length]||palette[0];
 };
 
 // ── Apiary Edit Form ──────────────────────────────────────────────────────
@@ -1198,7 +1296,7 @@ const HiveForm = ({ existing, apiaryId, allHives=[], onSave, onNavigate }) => {
   const [form,setForm]=useState(()=>{
     if(existing) return existing;
     const usedColors=allHives.filter(h=>h.apiaryId===apiaryId&&h.status!=="Archived").map(h=>h.color).filter(Boolean);
-    const autoColor=nextColor(usedColors);
+    const autoColor=nextColor(usedColors, HIVE_COLOR_PALETTE);
     return {name:"",type:"National",isNuc:false,useBroodAsSuper:false,color:autoColor,location:"",status:"",installed:TODAY,source:"",queen_year:thisYear,queen_marked:false,queen_color:queenColorForYear(thisYear),boxes:1,supers:0,notes:"",apiaryId};
   });
   const set=(k,v)=>setForm(f=>({...f,[k]:v}));
@@ -1221,7 +1319,7 @@ const HiveForm = ({ existing, apiaryId, allHives=[], onSave, onNavigate }) => {
           <Field label="Brood Box as Super" style={{ marginBottom:12 }}><Toggle value={form.useBroodAsSuper||false} onChange={v=>set("useBroodAsSuper",v)} label="Using a brood box as super"/></Field>
           <Field label="Location"><Input value={form.location} onChange={v=>set("location",v)} placeholder="e.g. Stand 1"/></Field>
           <Field label="Colour Tag">
-            <div style={{ display:"flex",gap:8,flexWrap:"wrap" }}>{COLOR_PALETTE.map(col=><div key={col} onClick={()=>set("color",col)} style={{ width:28,height:28,borderRadius:8,background:col,cursor:"pointer",border:form.color===col?"3px solid #333":"3px solid transparent" }}/>)}</div>
+            <div style={{ display:"flex",gap:8,flexWrap:"wrap" }}>{HIVE_COLOR_PALETTE.map(col=><div key={col} onClick={()=>set("color",col)} style={{ width:28,height:28,borderRadius:8,background:col,cursor:"pointer",border:form.color===col?"3px solid #333":"3px solid transparent" }}/>)}</div>
           </Field>
         </Card>
         <Card style={{ marginBottom:12 }}>
@@ -1834,8 +1932,13 @@ const EquipmentShed = ({ hives, onBack, manualCounts, onSetManual }) => {
   const setManual=(k,v)=>onSetManual(k,v);
 
   const activeHives  = hives.filter(h=>h.status!=="Archived");
-  const nonNucHives  = activeHives.filter(h=>!h.isNuc);
-  const nucHives     = activeHives.filter(h=>h.isNuc);
+  const isMatingNuc  = h=>h.type==="Mating Nuc (Apidea)";
+  // Mating Nucs (Apidea) are tracked as their own equipment item and use no
+  // other equipment — excluded entirely from brood boxes, supers, queen
+  // excluders, feeders, roofs, floors and crown boards.
+  const matingNucHives = activeHives.filter(isMatingNuc);
+  const nonNucHives  = activeHives.filter(h=>!h.isNuc&&!isMatingNuc(h));
+  const nucHives     = activeHives.filter(h=>h.isNuc&&!isMatingNuc(h));
   // Brood boxes: nucs counted separately. For useBroodAsSuper hives, the supers field
   // holds additional National brood-box-sized boxes — count them all as brood boxes.
   // Standard hives just contribute their boxes count.
@@ -1849,9 +1952,10 @@ const EquipmentShed = ({ hives, onBack, manualCounts, onSetManual }) => {
   // Queen excluders: only where explicitly true (null/undefined means none fitted).
   const queenExcludersInUse = nonNucHives.filter(h=>h.queen_excluder===true).length;
   const nucsInUse       = nucHives.length;
-  // Feeders: nucs can have feeders too.
-  const feedersInUse    = activeHives.filter(h=>hasActiveFeeder(h)).length;
-  // Roofs, floors, crown boards: one per standard hive only (nucs have their own lids).
+  const matingNucsInUse = matingNucHives.length;
+  // Feeders: nucs can have feeders too; mating nucs cannot.
+  const feedersInUse    = activeHives.filter(h=>!isMatingNuc(h)&&hasActiveFeeder(h)).length;
+  // Roofs, floors, crown boards: one per standard hive only (nucs have their own lids, mating nucs need none).
   const roofsInUse      = nonNucHives.length;
   const floorsInUse     = nonNucHives.length;
   const crownBoardsInUse = nonNucHives.length;
@@ -1861,6 +1965,7 @@ const EquipmentShed = ({ hives, onBack, manualCounts, onSetManual }) => {
     {key:"supers",        label:"Supers",           inUse:supersInUse,         total:manualCounts.supers_total},
     {key:"queenExcluders",label:"Queen Excluders",  inUse:queenExcludersInUse, total:manualCounts.queenExcluders_total},
     {key:"nucs",          label:"Nucs",             inUse:nucsInUse,           total:manualCounts.nucs_total},
+    {key:"matingNucs",    label:"Mating Nucs",      inUse:matingNucsInUse,     total:manualCounts.matingNucs_total||0},
     {key:"feeders",       label:"Feeders",          inUse:feedersInUse,        total:manualCounts.feeders_total},
     {key:"roofs",         label:"Roofs",            inUse:roofsInUse,          total:manualCounts.roofs_total},
     {key:"floors",        label:"Floors",           inUse:floorsInUse,         total:manualCounts.floors_total},
@@ -1920,7 +2025,7 @@ const AboutPage = ({ onBack }) => (
   <PageWrap>
     <PageHeader title="About BeeMark" onBack={onBack}/>
     <div style={{ padding:24 }}>
-      <div style={{ display:"flex",justifyContent:"center",marginBottom:32 }}>
+      <div style={{ display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",marginBottom:32 }}>
         <img src={LOGO_B64} alt="BeeMark" style={{ width:220,maxWidth:"85%" }}/>
         <div style={{ textAlign:"center",marginTop:8,fontSize:14,fontWeight:600,color:C.textMuted,letterSpacing:1 }}>{APP_DISPLAY_VERSION}</div>
       </div>
@@ -2200,7 +2305,7 @@ const BeekeeperInfo = ({ onBack }) => {
 // ── Data Transfer Page ──────────────────────────────────────────────────────
 // APP_VERSION bumped here whenever the data schema changes — exported files carry it
 const APP_VERSION = 4;
-const APP_DISPLAY_VERSION = "v1.2.2";
+const APP_DISPLAY_VERSION = "v1.3.0";
 
 const DataTransfer = ({ hives, apiaries, activeApiaryId, equipManual, onImport, onBack }) => {
   const [importStatus,setImportStatus]=useState("");
@@ -2482,7 +2587,7 @@ export default function App() {
   const [hiveOrder,setHiveOrder]=useState([]);
   const [equipManual,setEquipManual]=useState({
     broodBoxes_total:0, supers_total:0, queenExcluders_total:0,
-    nucs_total:0, feeders_total:0, roofs_total:0, floors_total:0, crownBoards_total:0,
+    nucs_total:0, matingNucs_total:0, feeders_total:0, roofs_total:0, floors_total:0, crownBoards_total:0,
   });
 
   // Load all data from IndexedDB on mount (with localStorage migration)
@@ -2494,13 +2599,14 @@ export default function App() {
         idbGet("bm_apiaries3",null),
         idbGet("bm_activeApiary3",null),
         idbGet("bm_hive_order",[]),
-        idbGet("bm_equip_manual",{broodBoxes_total:0,supers_total:0,queenExcluders_total:0,nucs_total:0,feeders_total:0,roofs_total:0,floors_total:0,crownBoards_total:0}),
+        idbGet("bm_equip_manual",{broodBoxes_total:0,supers_total:0,queenExcluders_total:0,nucs_total:0,matingNucs_total:0,feeders_total:0,roofs_total:0,floors_total:0,crownBoards_total:0}),
       ]);
       setHives(h);
       setApiaries(a);
       setActiveApiaryId(aid);
       setHiveOrder(ho||[]);
-      setEquipManual(em);
+      // Merge with defaults so older backups/storage missing newer keys (e.g. matingNucs_total) don't break counts
+      setEquipManual(prev=>({...prev,...em}));
       setDbReady(true);
     })();
   },[]);
@@ -2583,7 +2689,14 @@ export default function App() {
   if(!apiaries||apiaries.length===0){
     return (
       <div style={{ fontFamily:"'Roboto',sans-serif",maxWidth:480,margin:"0 auto",boxShadow:"0 0 40px rgba(0,0,0,.12)",minHeight:"100vh" }}>
-        <ApiarySetup onComplete={a=>{ setApiaries([a]); setActiveApiaryId(a.id); }}/>
+        <ApiarySetup onComplete={a=>{ setApiaries([a]); setActiveApiaryId(a.id); }}
+          onRestoreBackup={d=>{
+            setHives(d.hives||[]);
+            setApiaries(d.apiaries||[]);
+            const restoredId=d.activeApiaryId&&(d.apiaries||[]).find(a=>a.id===d.activeApiaryId)?d.activeApiaryId:(d.apiaries?.[0]?.id||null);
+            setActiveApiaryId(restoredId);
+            if(d.equipManual) setEquipManual(prev=>({...prev,...d.equipManual}));
+          }}/>
       </div>
     );
   }
