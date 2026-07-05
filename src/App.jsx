@@ -2319,7 +2319,11 @@ const BeekeeperInfo = ({ onBack }) => {
 // ── Data Transfer Page ──────────────────────────────────────────────────────
 // APP_VERSION bumped here whenever the data schema changes — exported files carry it
 const APP_VERSION = 4;
+<<<<<<< HEAD
 const APP_DISPLAY_VERSION = "v1.4.0";
+=======
+const APP_DISPLAY_VERSION = "v1.3.0";
+>>>>>>> 3c02331ee958a004ca07a31ba0e9ad676bb74b2f
 
 const DataTransfer = ({ hives, apiaries, activeApiaryId, equipManual, onImport, onBack }) => {
   const [importStatus,setImportStatus]=useState("");
