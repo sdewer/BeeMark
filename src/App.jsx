@@ -57,7 +57,7 @@ const INSPECTION_DEFAULTS = {
 };
 // Default empty action entry
 const emptyAction = () => ({id:uid(),type:"",qty:"1",details:"",swarm_status:"",old_queen_location:"",old_queen_hive_number:"",new_hive_name:"",new_hive_apiary_id:""});
-const ACTION_TYPES = ["Artificial Swarm","Split","Added Queen","Removed Queen","Clipped Queen","Added Queen Cell","Added Super","Removed Super","Added Brood Box","Removed Brood Box","Frame of Eggs Added","Frame of Eggs Removed","Feed","Remove Feeder","Move Hive","Combine Hive","Sold/Given Away","Shake Out","Other"];
+const ACTION_TYPES = ["Artificial Swarm","Split","Added Queen","Removed Queen","Clipped Queen","Added Queen Cell","Added Super","Removed Super","Added Brood Box","Removed Brood Box","Frame of Eggs Added","Frame of Eggs Removed","Feed","Remove Feeder","Move Hive","Combine Hive","Sold/Given Away","Other"];
 // Actions that affect super count (qty dropdown) or box count
 const SUPER_CHANGE_ACTIONS = ["Added Super","Removed Super"];
 const BOX_CHANGE_ACTIONS   = ["Added Brood Box","Removed Brood Box"];
@@ -75,6 +75,7 @@ const SWARM_SPLIT_ACTIONS  = ["Artificial Swarm","Split"];
 const OLD_QUEEN_LOCATIONS  = ["New Hive","Hive Number","Queen Removed"];
 const hiveTypeLabel = hive => hive.isNuc ? `${hive.type||"National"} (Nuc)` : (hive.type||"National");
 const hiveTypeLabelWithLocation = hive => { const typeLabel=hiveTypeLabel(hive); return hive.location?`${typeLabel} - ${hive.location}`:typeLabel; };
+const isMatingNuc = hive => hive.type==="Mating Nuc (Apidea)";
 // ── IndexedDB storage layer ───────────────────────────────────────────────
 const DB_NAME = "beemark";
 const DB_VER  = 1;
@@ -458,7 +459,7 @@ const InspectionSummaryBar = ({ ins }) => {
 };
 
 // ── Apiary Setup (first-run + add new) ────────────────────────────────────
-const ApiarySetup = ({ onComplete, isAdding=false, onCancel, allApiaries=[], onRestoreBackup }) => {
+const ApiarySetup = ({ onComplete, isAdding=false, onCancel, allApiaries=[] }) => {
   const [form,setForm]=useState(()=>{
     const usedColors=allApiaries.map(a=>a.color).filter(Boolean);
     return {id:uid(),name:"",location:"",notes:"",beebase_id:"",color:nextColor(usedColors)};
@@ -469,48 +470,12 @@ const ApiarySetup = ({ onComplete, isAdding=false, onCancel, allApiaries=[], onR
     if(!form.location.trim()){alert("Please enter a location");return;}
     onComplete({...form});
   };
-
-  // ── Restore-from-backup (first-run only) ──
-  const [restoring,setRestoring]=useState(false);
-  const [restoreError,setRestoreError]=useState("");
-  const [restorePreview,setRestorePreview]=useState(null);
-
-  const handleRestoreFile = e => {
-    const file=e.target.files?.[0];
-    if(!file) return;
-    setRestoring(true);
-    setRestoreError("");
-    setRestorePreview(null);
-    const reader=new FileReader();
-    reader.onload=ev=>{
-      try{
-        const data=JSON.parse(ev.target.result);
-        if(!data.hives||!data.apiaries) throw new Error("Invalid BeeMark backup file — missing hives or apiaries data.");
-        setRestorePreview(data);
-      }catch(err){
-        setRestoreError("error: "+err.message);
-      }
-      setRestoring(false);
-    };
-    reader.onerror=()=>{ setRestoreError("error: Could not read file"); setRestoring(false); };
-    reader.readAsText(file);
-    e.target.value="";
-  };
-
-  const doRestore = () => {
-    if(!restorePreview) return;
-    onRestoreBackup(restorePreview);
-  };
-
-  const previewActiveHives   = restorePreview?.hives?.filter(h=>h.status!=="Archived") || [];
-  const previewArchivedHives = restorePreview?.hives?.filter(h=>h.status==="Archived")  || [];
-
   return (
     <div style={{ minHeight:"100vh",display:"flex",flexDirection:"column",justifyContent:"center",padding:24,background:`linear-gradient(160deg,${C.primaryLight} 0%,${C.bg} 50%,${C.surface} 100%)` }}>
       <HexBg opacity={0.06}/>
       <div style={{ position:"relative",zIndex:1,maxWidth:420,margin:"0 auto",width:"100%" }}>
         {!isAdding?(
-          <div style={{ textAlign:"center",marginBottom:isAdding?32:24,display:"flex",flexDirection:"column",alignItems:"center" }}>
+          <div style={{ textAlign:"center",marginBottom:40,display:"flex",flexDirection:"column",alignItems:"center" }}>
             <img src={LOGO_B64} alt="BeeMark" style={{ width:200,maxWidth:"80%",marginBottom:20,display:"block",marginLeft:"auto",marginRight:"auto" }}/>
             <div style={{ fontSize:17,color:C.textSecondary,lineHeight:1.6 }}>Set up your first apiary to get started.</div>
           </div>
@@ -521,81 +486,21 @@ const ApiarySetup = ({ onComplete, isAdding=false, onCancel, allApiaries=[], onR
             <div style={{ fontSize:15,color:C.textMuted,marginTop:4 }}>Create a new apiary location.</div>
           </div>
         )}
-
-        {!isAdding&&!restorePreview&&(
-          <Card style={{ marginBottom:16,background:"rgba(255,255,255,.92)" }}>
-            <label style={{ display:"block" }}>
-              <div style={{ width:"100%",background:`linear-gradient(135deg,${C.accent},#1565C0)`,color:"#fff",borderRadius:10,padding:"13px 22px",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:6,fontFamily:"'Roboto',sans-serif",fontWeight:600,fontSize:16,boxSizing:"border-box" }}>
-                <Icon name="restore" color="#fff" size={17}/> {restoring?"Reading file...":"Already a user? Upload Backup File"}
-              </div>
-              <input type="file" accept=".json" onChange={handleRestoreFile} style={{ display:"none" }}/>
-            </label>
-            {restoreError&&(
-              <div style={{ marginTop:10,padding:"10px 14px",background:`rgba(${hexToRgb(C.red)},.08)`,border:`1.5px solid ${C.red}`,borderRadius:10,fontSize:14,color:C.red }}>
-                {restoreError}
-              </div>
-            )}
-            <div style={{ display:"flex",alignItems:"center",gap:10,margin:"14px 0" }}>
-              <div style={{ flex:1,height:1,background:C.border }}/>
-              <div style={{ fontSize:13,color:C.textMuted,fontWeight:700,letterSpacing:0.5 }}>OR</div>
-              <div style={{ flex:1,height:1,background:C.border }}/>
-            </div>
-            <div style={{ textAlign:"center",fontSize:15,color:C.textSecondary,lineHeight:1.5 }}>New user? Create your first apiary below.</div>
-          </Card>
-        )}
-
-        {!isAdding&&restorePreview&&(
-          <Card style={{ marginBottom:16,background:"rgba(255,255,255,.92)" }}>
-            <div style={{ fontWeight:700,color:C.textPrimary,fontSize:17,marginBottom:10 }}>Confirm Restore</div>
-            <div style={{ fontSize:14,color:C.textSecondary,marginBottom:10,lineHeight:1.6 }}>This backup contains:</div>
-            <div style={{ display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:6,marginBottom:14 }}>
-              {[
-                {label:"Active Hives",   value:previewActiveHives.length,    color:C.primary},
-                {label:"Archived Hives", value:previewArchivedHives.length,   color:C.textMuted},
-                {label:"Apiaries",       value:restorePreview.apiaries?.length||0, color:C.accent},
-                {label:"Inspections",    value:(restorePreview._summary?.inspections??restorePreview.hives?.reduce((s,h)=>s+h.inspections.length,0)), color:C.orange},
-                {label:"Treatments",     value:(restorePreview._summary?.treatments??restorePreview.hives?.reduce((s,h)=>s+h.treatments.length,0)), color:C.blue},
-                {label:"Actions",        value:(restorePreview._summary?.actions??restorePreview.hives?.reduce((s,h)=>s+(h.interventions||[]).length,0)), color:C.green},
-              ].map(s=>(
-                <div key={s.label} style={{ background:C.bg,borderRadius:8,padding:"8px 6px",textAlign:"center",border:`1px solid ${C.border}` }}>
-                  <div style={{ fontSize:11,color:C.textMuted,textTransform:"uppercase",letterSpacing:0.6,fontWeight:700,marginBottom:2 }}>{s.label}</div>
-                  <div style={{ fontSize:18,fontWeight:700,color:s.color }}>{s.value}</div>
-                </div>
-              ))}
-            </div>
-            {restorePreview.exportedAt&&(
-              <div style={{ fontSize:13,color:C.textMuted,marginBottom:12 }}>
-                Exported: {new Date(restorePreview.exportedAt).toLocaleDateString("en-GB",{day:"numeric",month:"short",year:"numeric",hour:"2-digit",minute:"2-digit"})}
-              </div>
-            )}
-            <div style={{ display:"flex",gap:10 }}>
-              <Btn onClick={()=>setRestorePreview(null)} variant="ghost" style={{ flex:1,justifyContent:"center" }}>Cancel</Btn>
-              <Btn onClick={doRestore} style={{ flex:1,justifyContent:"center" }}>
-                <Icon name="restore" size={15} color="#fff"/> Confirm Restore
-              </Btn>
-            </div>
-          </Card>
-        )}
-
-        {!restorePreview&&(
-          <>
-            <Card style={{ marginBottom:16,background:"rgba(255,255,255,.92)" }}>
-              <div style={{ fontWeight:700,color:C.textPrimary,marginBottom:16,fontSize:17 }}>Apiary Details</div>
-              <Field label="Apiary Name *"><Input value={form.name} onChange={v=>set("name",v)} placeholder="e.g. Meadow Apiary"/></Field>
-              <Field label="Location *"><Input value={form.location} onChange={v=>set("location",v)} placeholder="e.g. Back Garden"/></Field>
-              <Field label="BeeBase Apiary ID"><Input value={form.beebase_id||""} onChange={v=>set("beebase_id",v)} placeholder="e.g. GB-1234567"/></Field>
-              <Field label="Notes" style={{ marginBottom:0 }}>
-                <textarea value={form.notes} onChange={e=>set("notes",e.target.value)} placeholder="Any notes about the site..." style={{...inputBase,minHeight:70,resize:"vertical"}}/>
-              </Field>
-            </Card>
-            <div style={{ display:"flex",gap:10 }}>
-              {isAdding&&<Btn onClick={onCancel} variant="ghost" style={{ flex:1,justifyContent:"center" }}>Cancel</Btn>}
-              <Btn onClick={doSave} style={{ flex:1,justifyContent:"center",padding:15 }}>
-                <Icon name="check" size={18} color="#fff"/> {isAdding?"Save Apiary":"Create Apiary"}
-              </Btn>
-            </div>
-          </>
-        )}
+        <Card style={{ marginBottom:16,background:"rgba(255,255,255,.92)" }}>
+          <div style={{ fontWeight:700,color:C.textPrimary,marginBottom:16,fontSize:17 }}>Apiary Details</div>
+          <Field label="Apiary Name *"><Input value={form.name} onChange={v=>set("name",v)} placeholder="e.g. Meadow Apiary"/></Field>
+          <Field label="Location *"><Input value={form.location} onChange={v=>set("location",v)} placeholder="e.g. Back Garden"/></Field>
+          <Field label="BeeBase Apiary ID"><Input value={form.beebase_id||""} onChange={v=>set("beebase_id",v)} placeholder="e.g. GB-1234567"/></Field>
+          <Field label="Notes" style={{ marginBottom:0 }}>
+            <textarea value={form.notes} onChange={e=>set("notes",e.target.value)} placeholder="Any notes about the site..." style={{...inputBase,minHeight:70,resize:"vertical"}}/>
+          </Field>
+        </Card>
+        <div style={{ display:"flex",gap:10 }}>
+          {isAdding&&<Btn onClick={onCancel} variant="ghost" style={{ flex:1,justifyContent:"center" }}>Cancel</Btn>}
+          <Btn onClick={doSave} style={{ flex:1,justifyContent:"center",padding:15 }}>
+            <Icon name="check" size={18} color="#fff"/> {isAdding?"Save Apiary":"Create Apiary"}
+          </Btn>
+        </div>
       </div>
     </div>
   );
@@ -603,11 +508,9 @@ const ApiarySetup = ({ onComplete, isAdding=false, onCancel, allApiaries=[], onR
 
 // Palette for auto-assigning colours to new hives/apiaries
 const COLOR_PALETTE = ["#2DBD8F","#3B9EE8","#E53935","#F57C00","#8E24AA","#00897B","#43A047","#0288D1","#E91E63","#FF6F00","#1565C0","#558B2F"];
-// Hive colour tags support an additional yellow option (not used for apiaries)
-const HIVE_COLOR_PALETTE = [...COLOR_PALETTE, "#FDD835"];
-const nextColor = (usedColors, palette=COLOR_PALETTE) => {
+const nextColor = (usedColors) => {
   const used = new Set(usedColors);
-  const unused=palette.find(c=>!used.has(c)); if(unused) return unused; return palette[usedColors.length%palette.length]||palette[0];
+  const unused=COLOR_PALETTE.find(c=>!used.has(c)); if(unused) return unused; return COLOR_PALETTE[usedColors.length%COLOR_PALETTE.length]||COLOR_PALETTE[0];
 };
 
 // ── Apiary Edit Form ──────────────────────────────────────────────────────
@@ -730,9 +633,11 @@ const ApiaryDetail = ({ apiary, hives, onEdit, onDelete, onBack, onSaveNotes, on
       <div style={{ padding:16 }}>
         {/* Summary tiles — active hives only */}
         {(() => {
-          const totalSupers = activeHives.reduce((s,h)=>s+Number(h.supers||0),0);
+          const nonMatingActive = activeHives.filter(h=>!isMatingNuc(h));
+          const matingNucCount = activeHives.filter(isMatingNuc).length;
+          const totalSupers = nonMatingActive.reduce((s,h)=>s+Number(h.supers||0),0);
           const tiles = [
-            {label:"Hives",         value:activeHives.length,                   color:apiaryColor},
+            {label:"Hives",         value:nonMatingActive.length,               color:apiaryColor, note:matingNucCount>0?`+${matingNucCount} mating nuc${matingNucCount!==1?"s":""}`:null},
             {label:"Total Supers",  value:totalSupers,                          color:C.primary},
             {label:"Last Inspected",value:lastIns?fmtDate(lastIns.date):"None", color:C.orange},
           ];
@@ -742,6 +647,7 @@ const ApiaryDetail = ({ apiary, hives, onEdit, onDelete, onBack, onSaveNotes, on
                 <Card key={s.label} style={{ padding:"14px 12px" }}>
                   <div style={{ fontSize:12,color:C.textMuted,textTransform:"uppercase",letterSpacing:0.8,fontWeight:700,marginBottom:4 }}>{s.label}</div>
                   <div style={{ fontSize:18,fontWeight:700,color:s.color,lineHeight:1.2 }}>{String(s.value)}</div>
+                  {s.note&&<div style={{ fontSize:11,color:C.textMuted,marginTop:2,fontWeight:600 }}>{s.note}</div>}
                 </Card>
               ))}
             </div>
@@ -810,7 +716,9 @@ const ApiaryDetail = ({ apiary, hives, onEdit, onDelete, onBack, onSaveNotes, on
 
         {/* Archived hives — collapsible section */}
         {(()=>{
-          const archivedHives=apiaryHives.filter(h=>h.status==="Archived");
+          const archivedHives=apiaryHives.filter(h=>h.status==="Archived")
+            .slice()
+            .sort((a,b)=>new Date(b.archivedAt||0)-new Date(a.archivedAt||0));
           if(archivedHives.length===0) return null;
           return <ArchivedHivesSection hives={archivedHives} onNavigate={onNavigate}/>;
         })()}
@@ -836,7 +744,9 @@ const ApiarySettings = ({ apiaries, hives, activeApiaryId, onSaveApiary, onAddAp
         <div style={{ display:"flex",flexDirection:"column",gap:10 }}>
           {apiaries.map(a=>{
             const aHives=hives.filter(h=>h.apiaryId===a.id);
-            const activeCount=aHives.filter(h=>h.status!=="Archived").length;
+            const aActiveHives=aHives.filter(h=>h.status!=="Archived");
+            const activeCount=aActiveHives.filter(h=>!isMatingNuc(h)).length;
+            const matingNucCount=aActiveHives.filter(isMatingNuc).length;
             const allIns=aHives.flatMap(h=>h.inspections);
             const lastIns=allIns.length?allIns.reduce((x,b)=>new Date(x.date)>new Date(b.date)?x:b):null;
             const isActive=a.id===activeApiaryId;
@@ -857,10 +767,11 @@ const ApiarySettings = ({ apiaries, hives, activeApiaryId, onSaveApiary, onAddAp
                       <div style={{ background:C.bg,borderRadius:8,padding:"8px 10px" }}>
                         <div style={{ fontSize:12,color:C.textMuted,textTransform:"uppercase",letterSpacing:0.7,fontWeight:700,marginBottom:2 }}>Hives</div>
                         <div style={{ fontSize:20,fontWeight:700,color:a.color||C.primary }}>{activeCount}</div>
+                        {matingNucCount>0&&<div style={{ fontSize:10,color:C.textMuted,fontWeight:600,marginTop:1 }}>{`+${matingNucCount} mating nuc${matingNucCount!==1?"s":""}`}</div>}
                       </div>
                       <div style={{ background:C.bg,borderRadius:8,padding:"8px 10px" }}>
                         <div style={{ fontSize:12,color:C.textMuted,textTransform:"uppercase",letterSpacing:0.7,fontWeight:700,marginBottom:2 }}>Supers</div>
-                        <div style={{ fontSize:20,fontWeight:700,color:C.accent }}>{aHives.filter(h=>h.status!=="Archived").reduce((s,h)=>s+Number(h.supers||0),0)}</div>
+                        <div style={{ fontSize:20,fontWeight:700,color:C.accent }}>{aActiveHives.filter(h=>!isMatingNuc(h)).reduce((s,h)=>s+Number(h.supers||0),0)}</div>
                       </div>
                       <div style={{ background:C.bg,borderRadius:8,padding:"8px 10px" }}>
                         <div style={{ fontSize:12,color:C.textMuted,textTransform:"uppercase",letterSpacing:0.7,fontWeight:700,marginBottom:2 }}>Inspected</div>
@@ -1065,9 +976,10 @@ const HiveList = ({ hives, apiaries, activeApiaryId, onSelectApiary, onNavigate,
 };
 
 // ── Hive Detail ────────────────────────────────────────────────────────────
-const HiveDetail = ({ hive, onNavigate, onDelete, onArchive, onRestore, onToggleTreatment, onToggleFeeder }) => {
+const HiveDetail = ({ hive, onNavigate, onDelete, onArchive, onRestore, onToggleTreatment, onToggleFeeder, onDeleteTreatment, onDeleteIntervention }) => {
   const [tab,setTab]=useState("overview");
   const [modal,setModal]=useState(null);
+  const [deleteTarget,setDeleteTarget]=useState(null); // {kind:'treatment'|'intervention', id}
   const tabs=[{id:"overview",label:"Overview"},{id:"inspections",label:"Log"},{id:"interventions",label:"Actions"},{id:"treatments",label:"Treatment"}];
   // Sort newest first; same-day: later-added entry (higher original index) first
   const sortedIns=[...hive.inspections].map((x,i)=>({...x,_idx:i})).sort((a,b)=>{
@@ -1090,6 +1002,9 @@ const HiveDetail = ({ hive, onNavigate, onDelete, onArchive, onRestore, onToggle
     <PageWrap>
       {modal==="delete"&&<ConfirmModal title={`Delete ${hive.name}?`} message="Permanently remove this hive and all its records. This cannot be undone." confirmLabel="Yes, Delete" confirmColor={C.red} onConfirm={()=>{setModal(null);onDelete(hive.id);}} onCancel={()=>setModal(null)}/>}
       {modal==="archive"&&<ConfirmModal title={`Archive ${hive.name}?`} message="Slot stays with all history preserved. Restore later for a new colony." confirmLabel="Archive" confirmColor={C.orange} onConfirm={()=>{setModal(null);onArchive(hive.id);}} onCancel={()=>setModal(null)}/>}
+      {deleteTarget&&<ConfirmModal title={`Delete this ${deleteTarget.kind}?`} message="Permanently remove this record. This cannot be undone." confirmLabel="Yes, Delete" confirmColor={C.red}
+        onConfirm={()=>{ const t=deleteTarget; setDeleteTarget(null); if(t.kind==="treatment") onDeleteTreatment&&onDeleteTreatment(hive.id,t.id); else onDeleteIntervention&&onDeleteIntervention(hive.id,t.id); }}
+        onCancel={()=>setDeleteTarget(null)}/>}
 
       <div style={{ background:`linear-gradient(135deg,${isArchived?C.textMuted:hiveColor},${isArchived?"#6b7280":C.primaryDark})`,padding:"16px 16px 0" }}>
         <div style={{ display:"flex",alignItems:"center",gap:10,marginBottom:14 }}>
@@ -1239,6 +1154,13 @@ const baseFields=[{label:"Type",value:hiveTypeLabel(hive)},{label:"Installed",va
                           <div style={{ fontSize:12,color:C.textMuted,marginTop:6 }}>Tap to mark {t.complete?"active":"complete"}</div>
                         </div>
                         <div style={{ display:"flex",flexDirection:"column",alignItems:"flex-end",gap:6 }}>
+                          <div onClick={e=>e.stopPropagation()}>
+                            <CogMenu items={[
+                              { label:"Edit", icon:<Icon name="edit" color={C.textSecondary} size={16}/>, onClick:()=>onNavigate("edit-treatment",{hiveId:hive.id,treatmentId:t.id}) },
+                              "divider",
+                              { label:"Delete", icon:<Icon name="trash" color={C.red} size={16}/>, danger:true, onClick:()=>setDeleteTarget({kind:"treatment",id:t.id}) },
+                            ]} buttonStyle={{ padding:4,background:"none" }} iconColor={C.textMuted}/>
+                          </div>
                           <BadgeImg src={CROSS_B64} alt="Treatment" name="cross"/>
                           <Chip label={statusLabel} color={statusColor} small/>
                         </div>
@@ -1276,7 +1198,16 @@ const baseFields=[{label:"Type",value:hiveTypeLabel(hive)},{label:"Installed",va
                           {iv.details&&<div style={{ fontSize:15,color:C.textSecondary,marginTop:4,lineHeight:1.4 }}>{iv.details}</div>}
                           {iv.source==="inspection"&&<div style={{ fontSize:12,color:C.textMuted,marginTop:4 }}>Added via inspection</div>}
                         </div>
-                        <BadgeImg src={ACTCOG_B64} alt="Action" name="actcog"/>
+                        <div style={{ display:"flex",flexDirection:"column",alignItems:"flex-end",gap:6 }}>
+                          <div onClick={e=>e.stopPropagation()}>
+                            <CogMenu items={[
+                              { label:"Edit", icon:<Icon name="edit" color={C.textSecondary} size={16}/>, onClick:()=>onNavigate("edit-intervention",{hiveId:hive.id,interventionId:iv.id}) },
+                              "divider",
+                              { label:"Delete", icon:<Icon name="trash" color={C.red} size={16}/>, danger:true, onClick:()=>setDeleteTarget({kind:"action",id:iv.id}) },
+                            ]} buttonStyle={{ padding:4,background:"none" }} iconColor={C.textMuted}/>
+                          </div>
+                          <BadgeImg src={ACTCOG_B64} alt="Action" name="actcog"/>
+                        </div>
                       </div>
                     </Card>
                   );
@@ -1296,7 +1227,7 @@ const HiveForm = ({ existing, apiaryId, allHives=[], onSave, onNavigate }) => {
   const [form,setForm]=useState(()=>{
     if(existing) return existing;
     const usedColors=allHives.filter(h=>h.apiaryId===apiaryId&&h.status!=="Archived").map(h=>h.color).filter(Boolean);
-    const autoColor=nextColor(usedColors, HIVE_COLOR_PALETTE);
+    const autoColor=nextColor(usedColors);
     return {name:"",type:"National",isNuc:false,useBroodAsSuper:false,color:autoColor,location:"",status:"",installed:TODAY,source:"",queen_year:thisYear,queen_marked:false,queen_color:queenColorForYear(thisYear),boxes:1,supers:0,notes:"",apiaryId};
   });
   const set=(k,v)=>setForm(f=>({...f,[k]:v}));
@@ -1319,7 +1250,7 @@ const HiveForm = ({ existing, apiaryId, allHives=[], onSave, onNavigate }) => {
           <Field label="Brood Box as Super" style={{ marginBottom:12 }}><Toggle value={form.useBroodAsSuper||false} onChange={v=>set("useBroodAsSuper",v)} label="Using a brood box as super"/></Field>
           <Field label="Location"><Input value={form.location} onChange={v=>set("location",v)} placeholder="e.g. Stand 1"/></Field>
           <Field label="Colour Tag">
-            <div style={{ display:"flex",gap:8,flexWrap:"wrap" }}>{HIVE_COLOR_PALETTE.map(col=><div key={col} onClick={()=>set("color",col)} style={{ width:28,height:28,borderRadius:8,background:col,cursor:"pointer",border:form.color===col?"3px solid #333":"3px solid transparent" }}/>)}</div>
+            <div style={{ display:"flex",gap:8,flexWrap:"wrap" }}>{COLOR_PALETTE.map(col=><div key={col} onClick={()=>set("color",col)} style={{ width:28,height:28,borderRadius:8,background:col,cursor:"pointer",border:form.color===col?"3px solid #333":"3px solid transparent" }}/>)}</div>
           </Field>
         </Card>
         <Card style={{ marginBottom:12 }}>
@@ -1447,6 +1378,11 @@ const MoveHiveFields = ({ act, ai, actions, setActions, apiaries, currentApiaryI
           <Field label="Apiary Name"><Input value={act.new_apiary_name||""} onChange={v=>upd("new_apiary_name",v)} placeholder="e.g. Back Garden"/></Field>
           <Field label="Location" style={{ marginBottom:0 }}><Input value={act.new_apiary_location||""} onChange={v=>upd("new_apiary_location",v)} placeholder="e.g. Village Road"/></Field>
         </div>
+      )}
+      {act.move_target_id&&(
+        <Field label="Update Hive Location (optional)" style={{ marginTop:10,marginBottom:0 }}>
+          <Input value={act.new_hive_location||""} onChange={v=>upd("new_hive_location",v)} placeholder="e.g. Stand 3 — leave blank to keep current"/>
+        </Field>
       )}
     </div>
   );
@@ -1673,11 +1609,6 @@ const InspectionForm = ({ hive, existing, onSave, onNavigate, onMarkTreatmentCom
                   1 brood box will be {act.type==="Added Brood Box"?"added to":"removed from"} this hive.
                 </div>
               )}
-              {act.type==="Shake Out"&&(
-                <div style={{ fontSize:14,color:C.red,marginBottom:10,padding:"8px 10px",background:`rgba(${hexToRgb(C.red)},.08)`,borderRadius:8 }}>
-                  This hive will be archived once this inspection is saved.
-                </div>
-              )}
               {SWARM_SPLIT_ACTIONS.includes(act.type)&&(
                 <SwarmSplitFields act={act} ai={ai} actions={form.actions} setActions={v=>set("actions",v)} apiaries={apiaries} currentApiaryId={hive.apiaryId}/>
               )}
@@ -1768,12 +1699,19 @@ const InspectionForm = ({ hive, existing, onSave, onNavigate, onMarkTreatmentCom
 
 // ── Inspection Viewer ──────────────────────────────────────────────────────
 const InspectionView = ({ hive, inspection, onNavigate, onDelete }) => {
+  const [modal,setModal]=useState(null);
   const yn=v=>v==="yes"?"✓ Yes":v==="no"?"✗ No":"—";
   const editScreen=inspection.weightOnly?"edit-weight":"edit-inspection";
+  const cogItems=[
+    { label:"Edit", icon:<Icon name="edit" color={C.textSecondary} size={16}/>, onClick:()=>onNavigate(editScreen,{hiveId:hive.id,inspectionId:inspection.id}) },
+    "divider",
+    { label:"Delete", icon:<Icon name="trash" color={C.red} size={16}/>, danger:true, onClick:()=>setModal("delete") },
+  ];
   return (
     <PageWrap>
+      {modal==="delete"&&<ConfirmModal title="Delete this log entry?" message="Permanently remove this inspection record. This cannot be undone." confirmLabel="Yes, Delete" confirmColor={C.red} onConfirm={()=>{ setModal(null); onDelete&&onDelete(hive.id,inspection.id); onNavigate("hive-detail",{hiveId:hive.id}); }} onCancel={()=>setModal(null)}/>}
       <PageHeader title={fmtDate(inspection.date)} subtitle={hive.name} onBack={()=>onNavigate("hive-detail",{hiveId:hive.id})}
-        right={<button onPointerDown={()=>onNavigate(editScreen,{hiveId:hive.id,inspectionId:inspection.id})} style={{ background:"rgba(255,255,255,.2)",border:"1.5px solid rgba(255,255,255,.45)",borderRadius:10,padding:"7px 12px",color:"#fff",fontFamily:"'Roboto',sans-serif",fontWeight:600,fontSize:14,cursor:"pointer" }}>Edit</button>}/>
+        right={<CogMenu items={cogItems} iconColor="#fff"/>}/>
       <div style={{ padding:16 }}>
         {inspection.notes&&(<Card style={{ marginBottom:12,background:`rgba(${hexToRgb(C.primary)},.04)`,border:`1.5px solid rgba(${hexToRgb(C.primary)},.25)` }}><div style={{ fontWeight:700,color:C.primary,fontSize:15,marginBottom:6 }}>Notes</div><div style={{ fontSize:16,color:C.textPrimary,lineHeight:1.6 }}>{inspection.notes}</div></Card>)}
         <Card style={{ marginBottom:12 }}>
@@ -1825,13 +1763,22 @@ const InspectionView = ({ hive, inspection, onNavigate, onDelete }) => {
 };
 
 // ── Treatment Form ─────────────────────────────────────────────────────────
-const TreatmentForm = ({ hive, onSave, onNavigate }) => {
-  const [form,setForm]=useState({product:"",reason:"",date:TODAY,duration_days:"",complete:false});
+const TreatmentForm = ({ hive, existing, onSave, onUpdate, onDelete, onNavigate }) => {
+  const [form,setForm]=useState(()=>existing?{product:existing.product||"",reason:existing.reason||"",date:existing.date||TODAY,duration_days:existing.duration_days||"",complete:!!existing.complete}:{product:"",reason:"",date:TODAY,duration_days:"",complete:false});
+  const [modal,setModal]=useState(null);
   const set=(k,v)=>setForm(f=>({...f,[k]:v}));
-  const doSave=()=>{ if(!form.product.trim()){alert("Enter product name");return;} onSave(hive.id,{...form,id:uid(),source:"manual"},"treatment"); onNavigate("hive-detail",{hiveId:hive.id}); };
+  const doSave=()=>{
+    if(!form.product.trim()){alert("Enter product name");return;}
+    if(existing) onUpdate&&onUpdate(hive.id,existing.id,form);
+    else onSave(hive.id,{...form,id:uid(),source:"manual"},"treatment");
+    onNavigate("hive-detail",{hiveId:hive.id});
+  };
+  const cogItems=existing?[{ label:"Delete", icon:<Icon name="trash" color={C.red} size={16}/>, danger:true, onClick:()=>setModal("delete") }]:null;
   return (
     <PageWrap>
-      <PageHeader title="Log Treatment" subtitle={hive.name} onBack={()=>onNavigate("hive-detail",{hiveId:hive.id})}/>
+      {modal==="delete"&&<ConfirmModal title="Delete this treatment?" message="Permanently remove this treatment record. This cannot be undone." confirmLabel="Yes, Delete" confirmColor={C.red} onConfirm={()=>{ setModal(null); onDelete&&onDelete(hive.id,existing.id); onNavigate("hive-detail",{hiveId:hive.id}); }} onCancel={()=>setModal(null)}/>}
+      <PageHeader title={existing?"Edit Treatment":"Log Treatment"} subtitle={hive.name} onBack={()=>onNavigate("hive-detail",{hiveId:hive.id})}
+        right={cogItems?<CogMenu items={cogItems} iconColor="#fff"/>:null}/>
       <div style={{ padding:16 }}>
         <Card style={{ marginBottom:12 }}>
           <Field label="Product"><Input value={form.product} onChange={v=>set("product",v)} placeholder="e.g. Apivar, OAV"/></Field>
@@ -1842,18 +1789,27 @@ const TreatmentForm = ({ hive, onSave, onNavigate }) => {
           </div>
           <Toggle value={form.complete} onChange={v=>set("complete",v)} label="Treatment complete"/>
         </Card>
-        <Btn onClick={doSave} style={{ width:"100%",justifyContent:"center" }}><Icon name="check" size={17} color="#fff"/> Save Treatment</Btn>
+        <Btn onClick={doSave} style={{ width:"100%",justifyContent:"center" }}><Icon name="check" size={17} color="#fff"/> {existing?"Update Treatment":"Save Treatment"}</Btn>
       </div>
     </PageWrap>
   );
 };
 
 // ── Action Form ────────────────────────────────────────────────────────────
-const ActionForm = ({ hive, onSave, onNavigate, apiaries=[], hives=[], onMoveHive, onSoldHive, onShakeOut, onCombineHive, onFrameEggsAction }) => {
-  const [form,setForm]=useState({type:"",qty:"1",details:"",date:TODAY});
+const ActionForm = ({ hive, existing, onSave, onUpdate, onDelete, onNavigate, apiaries=[], hives=[], onMoveHive, onSoldHive, onCombineHive, onFrameEggsAction }) => {
+  const [form,setForm]=useState(()=>existing?{...existing}:{type:"",qty:"1",details:"",date:TODAY});
+  const [modal,setModal]=useState(null);
   const set=(k,v)=>setForm(f=>({...f,[k]:v}));
   const doSave=()=>{
     if(!form.type){alert("Select an action type");return;}
+    if(existing){
+      // Editing an existing action only corrects the logged record — it does not
+      // re-trigger side effects (apiary moves, archiving, box/super counts etc.),
+      // matching how inspection edits behave.
+      onUpdate&&onUpdate(hive.id,existing.id,form);
+      onNavigate("hive-detail",{hiveId:hive.id});
+      return;
+    }
     if(form.type==="Move Hive"){
       if(!form.move_target_id){alert("Select a destination apiary");return;}
       onMoveHive&&onMoveHive(hive.id,form);
@@ -1866,10 +1822,6 @@ const ActionForm = ({ hive, onSave, onNavigate, apiaries=[], hives=[], onMoveHiv
     }
     if(form.type==="Sold/Given Away"){
       onSoldHive&&onSoldHive(hive.id,form);
-      onNavigate("hives"); return;
-    }
-    if(form.type==="Shake Out"){
-      onShakeOut&&onShakeOut(hive.id,form);
       onNavigate("hives"); return;
     }
     if(form.type==="Frame of Eggs Removed"){
@@ -1885,13 +1837,20 @@ const ActionForm = ({ hive, onSave, onNavigate, apiaries=[], hives=[], onMoveHiv
     onSave(hive.id,{...form,id:uid(),source:"manual",qty:form.qty||"1"},"intervention");
     onNavigate("hive-detail",{hiveId:hive.id});
   };
+  const cogItems=existing?[{ label:"Delete", icon:<Icon name="trash" color={C.red} size={16}/>, danger:true, onClick:()=>setModal("delete") }]:null;
   return (
     <PageWrap>
-      <PageHeader title="Log Action" subtitle={hive.name} onBack={()=>onNavigate("hive-detail",{hiveId:hive.id})}/>
+      {modal==="delete"&&<ConfirmModal title="Delete this action?" message="Permanently remove this action record. This cannot be undone." confirmLabel="Yes, Delete" confirmColor={C.red} onConfirm={()=>{ setModal(null); onDelete&&onDelete(hive.id,existing.id); onNavigate("hive-detail",{hiveId:hive.id}); }} onCancel={()=>setModal(null)}/>}
+      <PageHeader title={existing?"Edit Action":"Log Action"} subtitle={hive.name} onBack={()=>onNavigate("hive-detail",{hiveId:hive.id})}
+        right={cogItems?<CogMenu items={cogItems} iconColor="#fff"/>:null}/>
       <div style={{ padding:16 }}>
         <Card style={{ marginBottom:12 }}>
           <Field label="Date"><Input type="date" value={form.date} onChange={v=>set("date",v)}/></Field>
-          <Field label="Action Type"><DDSelect value={form.type} onChange={v=>{ set("type",v); set("qty","1"); set("move_target_id",""); }} options={ACTION_TYPES} placeholder="Select type..."/></Field>
+          {existing?(
+            <Field label="Action Type"><div style={{ padding:"12px 14px",background:C.bg,borderRadius:10,fontWeight:600,color:C.textPrimary }}>{form.type}</div></Field>
+          ):(
+            <Field label="Action Type"><DDSelect value={form.type} onChange={v=>{ set("type",v); set("qty","1"); set("move_target_id",""); }} options={ACTION_TYPES} placeholder="Select type..."/></Field>
+          )}
           {SUPER_CHANGE_ACTIONS.includes(form.type)&&(
             <Field label="How many supers?">
               <DDSelect value={form.qty||"1"} onChange={v=>set("qty",v)} options={SUPER_QTY_OPTIONS} placeholder="Quantity..."/>
@@ -1900,11 +1859,6 @@ const ActionForm = ({ hive, onSave, onNavigate, apiaries=[], hives=[], onMoveHiv
           {BOX_CHANGE_ACTIONS.includes(form.type)&&(
             <div style={{ fontSize:14,color:C.textMuted,marginBottom:10,padding:"8px 10px",background:"rgba(0,0,0,.04)",borderRadius:8 }}>
               1 brood box will be {form.type==="Added Brood Box"?"added to":"removed from"} this hive.
-            </div>
-          )}
-          {form.type==="Shake Out"&&(
-            <div style={{ fontSize:14,color:C.red,marginBottom:10,padding:"8px 10px",background:`rgba(${hexToRgb(C.red)},.08)`,borderRadius:8 }}>
-              This hive will be archived once this action is logged.
             </div>
           )}
           {form.type==="Move Hive"&&<MoveHiveFields act={form} ai={0} actions={[form]} setActions={arr=>setForm(arr[0])} apiaries={apiaries} currentApiaryId={hive.apiaryId}/>}
@@ -1946,13 +1900,12 @@ const EquipmentShed = ({ hives, onBack, manualCounts, onSetManual }) => {
   const setManual=(k,v)=>onSetManual(k,v);
 
   const activeHives  = hives.filter(h=>h.status!=="Archived");
-  const isMatingNuc  = h=>h.type==="Mating Nuc (Apidea)";
-  // Mating Nucs (Apidea) are tracked as their own equipment item and use no
-  // other equipment — excluded entirely from brood boxes, supers, queen
-  // excluders, feeders, roofs, floors and crown boards.
-  const matingNucHives = activeHives.filter(isMatingNuc);
-  const nonNucHives  = activeHives.filter(h=>!h.isNuc&&!isMatingNuc(h));
-  const nucHives     = activeHives.filter(h=>h.isNuc&&!isMatingNuc(h));
+  const nonNucHives  = activeHives.filter(h=>!h.isNuc);
+  const nucHives     = activeHives.filter(h=>h.isNuc);
+  // Nuc brood boxes: standard-size brood boxes/supers added on top of a Nuc's own 6-frame box —
+  // e.g. a Nuc that has grown and been given an extra brood box or a super. The base nuc box
+  // itself is still tracked separately via the "Nucs" count below.
+  const nucBroodBoxesInUse = nucHives.reduce((s,h)=>s+Math.max(0,Number(h.boxes||1)-1)+Number(h.supers||0),0);
   // Brood boxes: nucs counted separately. For useBroodAsSuper hives, the supers field
   // holds additional National brood-box-sized boxes — count them all as brood boxes.
   // Standard hives just contribute their boxes count.
@@ -1966,10 +1919,9 @@ const EquipmentShed = ({ hives, onBack, manualCounts, onSetManual }) => {
   // Queen excluders: only where explicitly true (null/undefined means none fitted).
   const queenExcludersInUse = nonNucHives.filter(h=>h.queen_excluder===true).length;
   const nucsInUse       = nucHives.length;
-  const matingNucsInUse = matingNucHives.length;
-  // Feeders: nucs can have feeders too; mating nucs cannot.
-  const feedersInUse    = activeHives.filter(h=>!isMatingNuc(h)&&hasActiveFeeder(h)).length;
-  // Roofs, floors, crown boards: one per standard hive only (nucs have their own lids, mating nucs need none).
+  // Feeders: nucs can have feeders too.
+  const feedersInUse    = activeHives.filter(h=>hasActiveFeeder(h)).length;
+  // Roofs, floors, crown boards: one per standard hive only (nucs have their own lids).
   const roofsInUse      = nonNucHives.length;
   const floorsInUse     = nonNucHives.length;
   const crownBoardsInUse = nonNucHives.length;
@@ -1979,7 +1931,7 @@ const EquipmentShed = ({ hives, onBack, manualCounts, onSetManual }) => {
     {key:"supers",        label:"Supers",           inUse:supersInUse,         total:manualCounts.supers_total},
     {key:"queenExcluders",label:"Queen Excluders",  inUse:queenExcludersInUse, total:manualCounts.queenExcluders_total},
     {key:"nucs",          label:"Nucs",             inUse:nucsInUse,           total:manualCounts.nucs_total},
-    {key:"matingNucs",    label:"Mating Nucs",      inUse:matingNucsInUse,     total:manualCounts.matingNucs_total||0},
+    {key:"nucBroodBoxes", label:"Nuc Brood Boxes",  inUse:nucBroodBoxesInUse,  total:manualCounts.nucBroodBoxes_total},
     {key:"feeders",       label:"Feeders",          inUse:feedersInUse,        total:manualCounts.feeders_total},
     {key:"roofs",         label:"Roofs",            inUse:roofsInUse,          total:manualCounts.roofs_total},
     {key:"floors",        label:"Floors",           inUse:floorsInUse,         total:manualCounts.floors_total},
@@ -2039,7 +1991,7 @@ const AboutPage = ({ onBack }) => (
   <PageWrap>
     <PageHeader title="About BeeMark" onBack={onBack}/>
     <div style={{ padding:24 }}>
-      <div style={{ display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",marginBottom:32 }}>
+      <div style={{ display:"flex",justifyContent:"center",marginBottom:32 }}>
         <img src={LOGO_B64} alt="BeeMark" style={{ width:220,maxWidth:"85%" }}/>
         <div style={{ textAlign:"center",marginTop:8,fontSize:14,fontWeight:600,color:C.textMuted,letterSpacing:1 }}>{APP_DISPLAY_VERSION}</div>
       </div>
@@ -2080,6 +2032,7 @@ const AboutPage = ({ onBack }) => (
 const BeekeeperInfo = ({ onBack }) => {
   const [tab,setTab]=useState("marking");
   const [pollenSort,setPollenSort]=useState("month");
+  const [pollenMonthFilter,setPollenMonthFilter]=useState("All");
   const tabs=[{id:"marking",label:"Queen Marking"},{id:"lifecycle",label:"Lifecycle"},{id:"pollen",label:"Pollen"}];
 
   const markingData=[
@@ -2258,7 +2211,16 @@ const BeekeeperInfo = ({ onBack }) => {
         {tab==="pollen"&&(()=>{
           // month number for sort (first month of range)
           const MONTH_ORDER={"Jan":1,"Feb":2,"Mar":3,"Apr":4,"May":5,"Jun":6,"Jul":7,"Aug":8,"Sep":9,"Oct":10,"Nov":11,"Dec":12};
+          const MONTH_NAMES=["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
           const firstMonth=m=>MONTH_ORDER[m.split(/[–\-\/]/)[0].trim().slice(0,3)]||13;
+          // Does a given month number fall within a "Jan–Mar" style range? Handles year wrap (e.g. "Nov–Feb").
+          const monthInRange=(monthNum,range)=>{
+            const parts=range.split(/[–\-\/]/).map(s=>s.trim().slice(0,3));
+            const start=MONTH_ORDER[parts[0]];
+            const end=MONTH_ORDER[parts[1]||parts[0]];
+            if(!start||!end) return true;
+            return start<=end ? (monthNum>=start&&monthNum<=end) : (monthNum>=start||monthNum<=end);
+          };
           // Hue of a hex colour for grouping
           const hexToHsl=hex=>{
             let r=parseInt(hex.slice(1,3),16)/255,g=parseInt(hex.slice(3,5),16)/255,b=parseInt(hex.slice(5,7),16)/255;
@@ -2268,7 +2230,8 @@ const BeekeeperInfo = ({ onBack }) => {
             let h=max===r?(g-b)/d+(g<b?6:0):max===g?(b-r)/d+2:(r-g)/d+4;
             return [h*60,s,l];
           };
-          const sorted=[...pollenData].sort((a,b)=>{
+          const filtered=pollenMonthFilter==="All"?pollenData:pollenData.filter(p=>monthInRange(MONTH_ORDER[pollenMonthFilter],p.months));
+          const sorted=[...filtered].sort((a,b)=>{
             if(pollenSort==="az") return a.flower.localeCompare(b.flower);
             if(pollenSort==="month") return firstMonth(a.months)-firstMonth(b.months);
             if(pollenSort==="colour"){
@@ -2285,6 +2248,17 @@ const BeekeeperInfo = ({ onBack }) => {
               <div style={{ fontSize:14,color:C.textMuted,marginBottom:12,lineHeight:1.6 }}>
                 Approximate pollen colours from common UK forage plants. Colours vary with locality, season and freshness.
               </div>
+              {/* Month filter pills */}
+              <div style={{ display:"flex",gap:6,marginBottom:10,overflowX:"auto",paddingBottom:2 }}>
+                {["All",...MONTH_NAMES].map(m=>(
+                  <button key={m} onClick={()=>setPollenMonthFilter(m)}
+                    style={{ flexShrink:0,border:"none",borderRadius:20,padding:"6px 12px",fontSize:13,fontWeight:600,cursor:"pointer",
+                      background:pollenMonthFilter===m?C.accent:`rgba(${hexToRgb(C.accent)},.08)`,
+                      color:pollenMonthFilter===m?"#fff":C.textSecondary,fontFamily:"'Roboto',sans-serif",transition:"all .15s" }}>
+                    {m}
+                  </button>
+                ))}
+              </div>
               {/* Sort pills */}
               <div style={{ display:"flex",gap:6,marginBottom:14 }}>
                 {[{id:"month",label:"Season"},{id:"az",label:"A–Z"},{id:"colour",label:"Colour"}].map(s=>(
@@ -2296,6 +2270,7 @@ const BeekeeperInfo = ({ onBack }) => {
                   </button>
                 ))}
               </div>
+              {sorted.length===0&&<LogoWatermark message="No pollen sources for this month"/>}
               <div style={{ display:"flex",flexDirection:"column",gap:6 }}>
                 {sorted.map(p=>(
                   <div key={p.flower} style={{ display:"flex",alignItems:"stretch",background:C.surface,borderRadius:12,border:`1px solid ${C.border}`,overflow:"hidden" }}>
@@ -2318,8 +2293,8 @@ const BeekeeperInfo = ({ onBack }) => {
 
 // ── Data Transfer Page ──────────────────────────────────────────────────────
 // APP_VERSION bumped here whenever the data schema changes — exported files carry it
-const APP_VERSION = 4;
-const APP_DISPLAY_VERSION = "v1.4.0";
+const APP_VERSION = 6;
+const APP_DISPLAY_VERSION = "v1.5.0";
 
 const DataTransfer = ({ hives, apiaries, activeApiaryId, equipManual, onImport, onBack }) => {
   const [importStatus,setImportStatus]=useState("");
@@ -2601,7 +2576,7 @@ export default function App() {
   const [hiveOrder,setHiveOrder]=useState([]);
   const [equipManual,setEquipManual]=useState({
     broodBoxes_total:0, supers_total:0, queenExcluders_total:0,
-    nucs_total:0, matingNucs_total:0, feeders_total:0, roofs_total:0, floors_total:0, crownBoards_total:0,
+    nucs_total:0, nucBroodBoxes_total:0, feeders_total:0, roofs_total:0, floors_total:0, crownBoards_total:0,
   });
 
   // Load all data from IndexedDB on mount (with localStorage migration)
@@ -2613,13 +2588,12 @@ export default function App() {
         idbGet("bm_apiaries3",null),
         idbGet("bm_activeApiary3",null),
         idbGet("bm_hive_order",[]),
-        idbGet("bm_equip_manual",{broodBoxes_total:0,supers_total:0,queenExcluders_total:0,nucs_total:0,matingNucs_total:0,feeders_total:0,roofs_total:0,floors_total:0,crownBoards_total:0}),
+        idbGet("bm_equip_manual",{broodBoxes_total:0,supers_total:0,queenExcluders_total:0,nucs_total:0,nucBroodBoxes_total:0,feeders_total:0,roofs_total:0,floors_total:0,crownBoards_total:0}),
       ]);
       setHives(h);
       setApiaries(a);
       setActiveApiaryId(aid);
       setHiveOrder(ho||[]);
-      // Merge with defaults so older backups/storage missing newer keys (e.g. matingNucs_total) don't break counts
       setEquipManual(prev=>({...prev,...em}));
       setDbReady(true);
     })();
@@ -2703,14 +2677,7 @@ export default function App() {
   if(!apiaries||apiaries.length===0){
     return (
       <div style={{ fontFamily:"'Roboto',sans-serif",maxWidth:480,margin:"0 auto",boxShadow:"0 0 40px rgba(0,0,0,.12)",minHeight:"100vh" }}>
-        <ApiarySetup onComplete={a=>{ setApiaries([a]); setActiveApiaryId(a.id); }}
-          onRestoreBackup={d=>{
-            setHives(d.hives||[]);
-            setApiaries(d.apiaries||[]);
-            const restoredId=d.activeApiaryId&&(d.apiaries||[]).find(a=>a.id===d.activeApiaryId)?d.activeApiaryId:(d.apiaries?.[0]?.id||null);
-            setActiveApiaryId(restoredId);
-            if(d.equipManual) setEquipManual(prev=>({...prev,...d.equipManual}));
-          }}/>
+        <ApiarySetup onComplete={a=>{ setApiaries([a]); setActiveApiaryId(a.id); }}/>
       </div>
     );
   }
@@ -2773,6 +2740,11 @@ export default function App() {
   const deleteHive=id=>{ setHives(hs=>hs.filter(h=>h.id!==id)); navigate("hives"); };
   const archiveHive=id=>setHives(hs=>hs.map(h=>h.id===id?{...h,status:"Archived",archivedAt:TODAY}:h));
   const restoreHive=id=>setHives(hs=>hs.map(h=>h.id===id?{...h,status:"",archivedAt:null}:h));
+  const deleteInspection=(hiveId,inspectionId)=>setHives(hs=>hs.map(h=>h.id!==hiveId?h:{...h,inspections:h.inspections.filter(i=>i.id!==inspectionId)}));
+  const deleteTreatment=(hiveId,treatId)=>setHives(hs=>hs.map(h=>h.id!==hiveId?h:{...h,treatments:h.treatments.filter(t=>t.id!==treatId)}));
+  const deleteIntervention=(hiveId,ivId)=>setHives(hs=>hs.map(h=>h.id!==hiveId?h:{...h,interventions:(h.interventions||[]).filter(iv=>iv.id!==ivId)}));
+  const updateTreatment=(hiveId,treatId,fields)=>setHives(hs=>hs.map(h=>h.id!==hiveId?h:{...h,treatments:h.treatments.map(t=>t.id===treatId?{...t,...fields}:t)}));
+  const updateIntervention=(hiveId,ivId,fields)=>setHives(hs=>hs.map(h=>h.id!==hiveId?h:{...h,interventions:(h.interventions||[]).map(iv=>iv.id===ivId?{...iv,...fields}:iv)}));
 
   // Helper: compute updated supers/boxes from an action record
   // Queen excluder auto-rule: non-nuc hive gets QE when supers>0, loses it when supers=0
@@ -2826,11 +2798,9 @@ export default function App() {
               if(act.swarm_status==="Queenless") hiveUpdate={...hiveUpdate,status:"Queenless"};
               else if(act.swarm_status==="Requeening") hiveUpdate={...hiveUpdate,status:"Requeening"};
               // Move hive
-              if(act.type==="Move Hive"&&moveTarget) hiveUpdate={...hiveUpdate,apiaryId:moveTarget};
+              if(act.type==="Move Hive"&&moveTarget) hiveUpdate={...hiveUpdate,apiaryId:moveTarget,...(act.new_hive_location?.trim()?{location:act.new_hive_location.trim()}:{})};
               // Sold/given away → archive with transfer info
               if(act.type==="Sold/Given Away"&&soldDetails) hiveUpdate={...hiveUpdate,status:"Archived",archivedAt:ins.date,transferred_to:soldDetails.transferred_to,transfer_notes:soldDetails.transfer_notes};
-              // Shake Out → archive the hive
-              if(act.type==="Shake Out") hiveUpdate={...hiveUpdate,status:"Archived",archivedAt:ins.date};
             }
           });
         }
@@ -2925,13 +2895,10 @@ export default function App() {
       setApiaries(as=>[...as,newAp]);
       targetId=newAp.id;
     }
-    setHives(hs=>hs.map(h=>h.id===hiveId?{...h,apiaryId:targetId,interventions:[...(h.interventions||[]),{id:uid(),type:"Move Hive",qty:"1",details:form.details||"",date:form.date||TODAY,source:"manual"}]}:h));
+    setHives(hs=>hs.map(h=>h.id===hiveId?{...h,apiaryId:targetId,...(form.new_hive_location?.trim()?{location:form.new_hive_location.trim()}:{}),interventions:[...(h.interventions||[]),{id:uid(),type:"Move Hive",qty:"1",details:form.details||"",date:form.date||TODAY,source:"manual"}]}:h));
   };
   const soldHive=(hiveId,form)=>{
     setHives(hs=>hs.map(h=>h.id===hiveId?{...h,status:"Archived",archivedAt:form.date||TODAY,transferred_to:form.transferred_to||"",transfer_notes:form.transfer_notes||form.details||"",interventions:[...(h.interventions||[]),{id:uid(),type:"Sold/Given Away",qty:"1",details:form.details||"",date:form.date||TODAY,source:"manual"}]}:h));
-  };
-  const shakeOutHive=(hiveId,form)=>{
-    setHives(hs=>hs.map(h=>h.id===hiveId?{...h,status:"Archived",archivedAt:form.date||TODAY,transfer_notes:form.details||"",interventions:[...(h.interventions||[]),{id:uid(),type:"Shake Out",qty:"1",details:form.details||"",date:form.date||TODAY,source:"manual"}]}:h));
   };
   const combineHive=(hiveId,form)=>{
     const targetHive=hives.find(h=>h.id===form.combine_target_id);
@@ -2967,7 +2934,7 @@ export default function App() {
     {id:"apiary-settings", label:"Apiary", icon:"apiary-nav"},
     {id:"info-hub",        label:"Info",   icon:"info-nav"},
   ];
-  const hiveScreens=["hive-detail","add-hive","edit-hive","add-inspection","edit-inspection","view-inspection","add-treatment","add-intervention","log-weight","edit-weight"];
+  const hiveScreens=["hive-detail","add-hive","edit-hive","add-inspection","edit-inspection","view-inspection","add-treatment","edit-treatment","add-intervention","edit-intervention","log-weight","edit-weight"];
   const hasOverdue=hives.filter(h=>h.apiaryId===currentApiaryId&&h.status!=="Archived").some(h=>{
     const last=h.inspections.slice().sort((a,b)=>new Date(b.date)-new Date(a.date))[0];
     return !last||(Date.now()-new Date(last.date))/86400000>14;
@@ -2981,12 +2948,12 @@ export default function App() {
   else if(screen==="apiary-add")      content=<ApiarySetup isAdding allApiaries={apiaries||[]} onComplete={a=>{ addApiary(a); navigate("apiary-settings"); }} onCancel={()=>navigate("apiary-settings")}/>;
   else if(screen==="add-hive")        content=<HiveForm apiaryId={currentApiaryId} allHives={hives} onSave={saveHive} onNavigate={navigate}/>;
   else if(screen==="edit-hive")       { const h=getHive(params.hiveId); if(h) content=<HiveForm existing={h} apiaryId={currentApiaryId} allHives={hives} onSave={saveHive} onNavigate={navigate}/>; }
-  else if(screen==="hive-detail")     { const h=getHive(params.hiveId); if(h) content=<HiveDetail hive={h} onNavigate={navigate} onDelete={deleteHive} onArchive={archiveHive} onRestore={restoreHive} onToggleTreatment={toggleTreatmentComplete} onToggleFeeder={toggleFeederActive}/>; }
+  else if(screen==="hive-detail")     { const h=getHive(params.hiveId); if(h) content=<HiveDetail hive={h} onNavigate={navigate} onDelete={deleteHive} onArchive={archiveHive} onRestore={restoreHive} onToggleTreatment={toggleTreatmentComplete} onToggleFeeder={toggleFeederActive} onDeleteTreatment={deleteTreatment} onDeleteIntervention={deleteIntervention}/>; }
   else if(screen==="add-inspection")  { const h=getHive(params.hiveId); if(h) content=<InspectionForm hive={h} onSave={saveInspection} onNavigate={navigate} onMarkTreatmentComplete={markTreatmentComplete} apiaries={apiaries}/>; }
   else if(screen==="edit-inspection") { const h=getHive(params.hiveId); const ins=h&&h.inspections.find(i=>i.id===params.inspectionId); if(h&&ins) content=<InspectionForm hive={h} existing={ins} onSave={saveInspection} onNavigate={navigate} onMarkTreatmentComplete={markTreatmentComplete} apiaries={apiaries}/>; }
   else if(screen==="log-weight")       { const h=getHive(params.hiveId); if(h) content=<WeightLog hive={h} onSave={saveInspection} onNavigate={navigate}/>; }
   else if(screen==="edit-weight")     { const h=getHive(params.hiveId); const ins=h&&h.inspections.find(i=>i.id===params.inspectionId); if(h&&ins) content=<WeightLog hive={h} existing={ins} onSave={saveInspection} onNavigate={navigate}/>; }
-  else if(screen==="view-inspection") { const h=getHive(params.hiveId); const ins=h&&h.inspections.find(i=>i.id===params.inspectionId); if(h&&ins) content=<InspectionView hive={h} inspection={ins} onNavigate={navigate}/>; }
+  else if(screen==="view-inspection") { const h=getHive(params.hiveId); const ins=h&&h.inspections.find(i=>i.id===params.inspectionId); if(h&&ins) content=<InspectionView hive={h} inspection={ins} onNavigate={navigate} onDelete={deleteInspection}/>; }
   else if(screen==="info-hub")        content=<InfoHub hives={hives} apiaries={apiaries} onNavigate={navigate}/>;
   else if(screen==="equipment-shed")  content=<EquipmentShed hives={hives} onBack={()=>navigate("info-hub")} manualCounts={equipManual} onSetManual={handleSetManual}/>
   else if(screen==="beekeeper-info")  content=<BeekeeperInfo onBack={()=>navigate("info-hub")}/>
@@ -3009,7 +2976,9 @@ export default function App() {
     onBack={()=>navigate("info-hub")}/>
   else if(screen==="about-page")      content=<AboutPage onBack={()=>navigate("info-hub")}/>;
   else if(screen==="add-treatment")   { const h=getHive(params.hiveId); if(h) content=<TreatmentForm hive={h} onSave={saveExtra} onNavigate={navigate}/>; }
-  else if(screen==="add-intervention"){ const h=getHive(params.hiveId); if(h) content=<ActionForm    hive={h} onSave={saveExtra} onNavigate={navigate} apiaries={apiaries||[]} hives={hives||[]} onMoveHive={moveHive} onSoldHive={soldHive} onShakeOut={shakeOutHive} onCombineHive={combineHive} onFrameEggsAction={frameEggsAction}/>; }
+  else if(screen==="edit-treatment")  { const h=getHive(params.hiveId); const t=h&&h.treatments.find(x=>x.id===params.treatmentId); if(h&&t) content=<TreatmentForm hive={h} existing={t} onUpdate={updateTreatment} onDelete={deleteTreatment} onNavigate={navigate}/>; }
+  else if(screen==="add-intervention"){ const h=getHive(params.hiveId); if(h) content=<ActionForm    hive={h} onSave={saveExtra} onNavigate={navigate} apiaries={apiaries||[]} hives={hives||[]} onMoveHive={moveHive} onSoldHive={soldHive} onCombineHive={combineHive} onFrameEggsAction={frameEggsAction}/>; }
+  else if(screen==="edit-intervention"){ const h=getHive(params.hiveId); const iv=h&&(h.interventions||[]).find(x=>x.id===params.interventionId); if(h&&iv) content=<ActionForm hive={h} existing={iv} onUpdate={updateIntervention} onDelete={deleteIntervention} onNavigate={navigate} apiaries={apiaries||[]} hives={hives||[]}/>; }
   if(!content) content=<HiveList hives={hives} apiaries={apiaries} activeApiaryId={activeApiaryId||currentApiaryId} onSelectApiary={setActiveApiaryId} onNavigate={navigate} customOrder={hiveOrder} onReorder={setHiveOrder}/>;
 
   if(!dbReady) return (
