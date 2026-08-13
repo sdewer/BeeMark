@@ -88,7 +88,7 @@ const INSPECTION_DEFAULTS = {
 };
 const DO_NOT_INSPECT_WEEK_OPTIONS = ["1","2","3","4"];
 // Default empty action entry
-const emptyAction = () => ({id:uid(),type:"",qty:"1",details:"",swarm_status:"",old_queen_location:"",old_queen_hive_number:"",new_hive_name:"",new_hive_apiary_id:""});
+const emptyAction = () => ({id:uid(),type:"",qty:"1",details:"",swarm_status:"",old_queen_location:"",old_queen_hive_number:"",old_queen_target_hive_id:"",old_queen_target_hive_name:"",new_hive_name:"",new_hive_apiary_id:""});
 const ACTION_TYPES = ["Artificial Swarm","Split","Added Queen","Removed Queen","Clipped Queen","Added Queen Cell","Added Super","Removed Super","Added Brood Box","Removed Brood Box","Frame of Eggs Added","Frame of Eggs Removed","Feed","Remove Feeder","Move Hive","Combine Hive","Shake Out","Sold/Given Away","Other"];
 // Actions that affect super count (qty dropdown) or box count
 const SUPER_CHANGE_ACTIONS = ["Added Super","Removed Super"];
@@ -282,6 +282,7 @@ const Icon = ({ name, size=22, color="currentColor", style={} }) => {
     location:`<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="${c}" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>`,
     honeypot:`<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="${c}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7.5 8.5h9l-1.1 11a2 2 0 0 1-2 1.8h-2.8a2 2 0 0 1-2-1.8l-1.1-11z"/><path d="M6.5 5.5h11"/><rect x="9" y="3" width="6" height="2.3" rx="0.6"/><path d="M8.3 12h7.4"/><path d="M8.7 15.3h6.6"/></svg>`,
     kofi:    `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none"><path d="M4 7h13a2 2 0 0 1 2 2v6a5 5 0 0 1-5 5H9a5 5 0 0 1-5-5V7z" fill="${c}"/><path d="M19 9h1.5a2.5 2.5 0 0 1 0 5H19" stroke="${c}" stroke-width="1.8" fill="none" stroke-linecap="round"/><path d="M8.2 10.3c.9-1.1 2.7-.7 2.8.7.1-1.4 1.9-1.8 2.8-.7.9 1.1.1 2.5-1 3.5l-1.8 1.6-1.8-1.6c-1.1-1-1.9-2.4-1-3.5z" fill="#FF5E5B"/></svg>`,
+    scale:   `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="${c}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="4" width="19" height="16" rx="3"/><circle cx="12" cy="12" r="4.2"/><line x1="12" y1="9.2" x2="12" y2="12" stroke-width="1.6"/><line x1="6" y1="7" x2="7.3" y2="7.9" stroke-width="1.6"/><line x1="18" y1="7" x2="16.7" y2="7.9" stroke-width="1.6"/></svg>`,
   };
   return <span style={{ display:"inline-flex",alignItems:"center",...style }} dangerouslySetInnerHTML={{ __html:icons[name]||icons.hive }}/>;
 };
@@ -1214,7 +1215,7 @@ const HiveDetail = ({ hive, onNavigate, onDelete, onArchive, onRestore, onToggle
   const cogItems=[
     { label:"Edit Hive",  icon:<Icon name="edit" color={C.textSecondary} size={16}/>, onClick:()=>onNavigate("edit-hive",{hiveId:hive.id}) },
     { label:"Log Weight", icon:<Icon name="inspect" color={C.accent} size={16}/>, onClick:()=>onNavigate("log-weight",{hiveId:hive.id}) },
-    { label:"Weight Tracking", icon:<Icon name="honeypot" color={C.honey} size={16}/>, onClick:()=>onNavigate("weight-tracking",{hiveId:hive.id}) },
+    { label:"Weight", icon:<Icon name="scale" color={C.accent} size={16}/>, onClick:()=>onNavigate("weight-tracking",{hiveId:hive.id}) },
     ...(!isArchived?[{ label:"Archive", icon:<Icon name="archive" color={C.orange} size={16}/>, onClick:()=>setModal("archive") }]:[]),
     ...(isArchived?[{ label:"Restore",  icon:<Icon name="restore" color={C.primary} size={16}/>, onClick:()=>onRestore(hive.id) }]:[]),
     "divider",
@@ -1664,8 +1665,9 @@ const HiveForm = ({ existing, apiaryId, allHives=[], onSave, onNavigate }) => {
 
 
 // ── Swarm / Split sub-form ─────────────────────────────────────────────────
-const SwarmSplitFields = ({ act, ai, actions, setActions, apiaries, currentApiaryId }) => {
+const SwarmSplitFields = ({ act, ai, actions, setActions, apiaries, currentApiaryId, hives=[], currentHiveId }) => {
   const upd = (k,v) => { const a=[...actions]; a[ai]={...a[ai],[k]:v}; setActions(a); };
+  const otherHives = hives.filter(h=>h.id!==currentHiveId&&h.status!=="Archived");
   return (
     <div>
       <Field label="Hive Status After">
@@ -1689,9 +1691,22 @@ const SwarmSplitFields = ({ act, ai, actions, setActions, apiaries, currentApiar
         </div>
       </Field>
       {act.old_queen_location==="Hive Number"&&(
-        <Field label="Enter Hive Number / Name">
-          <Input value={act.old_queen_hive_number||""} onChange={v=>upd("old_queen_hive_number",v)} placeholder="e.g. Hive 3"/>
-        </Field>
+        <div style={{ background:"rgba("+hexToRgb(C.primary)+",.06)",borderRadius:10,padding:"12px",marginBottom:10 }}>
+          <Field label="Which Hive?">
+            <DDSelect value={act.old_queen_target_hive_id||""} onChange={v=>{
+              const target=otherHives.find(h=>h.id===v);
+              const a=[...actions]; a[ai]={...a[ai],old_queen_target_hive_id:v,old_queen_target_hive_name:target?target.name:"",old_queen_hive_number:""}; setActions(a);
+            }} options={otherHives.map(h=>h.name)} rawOptions={otherHives.map(h=>h.id)} placeholder="Select hive..."/>
+          </Field>
+          {!act.old_queen_target_hive_id&&(
+            <div style={{ fontSize:13,color:C.textMuted,marginBottom:8,lineHeight:1.5 }}>Not in this apiary, or not tracked in BeeMark? Enter it below instead — the queen's age can only carry over automatically when you pick a hive above.</div>
+          )}
+          {!act.old_queen_target_hive_id&&(
+            <Field label="Or enter hive number / name" style={{ marginBottom:0 }}>
+              <Input value={act.old_queen_hive_number||""} onChange={v=>upd("old_queen_hive_number",v)} placeholder="e.g. Hive 3"/>
+            </Field>
+          )}
+        </div>
       )}
       {act.old_queen_location==="New Hive"&&(
         <div style={{ background:"rgba("+hexToRgb(C.primary)+",.06)",borderRadius:10,padding:"12px",marginBottom:10 }}>
@@ -1815,7 +1830,7 @@ const WeightLog = ({ hive, onSave, onNavigate, existing }) => {
 };
 
 // ── Inspection Form ────────────────────────────────────────────────────────
-const InspectionForm = ({ hive, existing, onSave, onNavigate, onMarkTreatmentComplete, apiaries=[] }) => {
+const InspectionForm = ({ hive, existing, onSave, onNavigate, onMarkTreatmentComplete, apiaries=[], hives=[] }) => {
   const [form,setForm]=useState(existing||{...INSPECTION_DEFAULTS,id:uid(),date:TODAY,inspector:""});
   const set=(k,v)=>setForm(f=>({...f,[k]:v}));
   const seenItems=[
@@ -1950,7 +1965,7 @@ const InspectionForm = ({ hive, existing, onSave, onNavigate, onMarkTreatmentCom
             <div key={act.id} style={{ background:C.bg,borderRadius:10,padding:12,marginTop:8,position:"relative" }}>
               {form.actions.length>1&&<button onClick={()=>set("actions",form.actions.filter((_,i)=>i!==ai))} style={{ position:"absolute",top:8,right:8,background:"none",border:"none",cursor:"pointer",color:C.red,fontSize:20,lineHeight:1 }}>×</button>}
               <Field label={"Action "+(form.actions.length>1?ai+1+"":"")}>
-                <DDSelect value={act.type} onChange={v=>{ const a=[...form.actions]; a[ai]={...a[ai],type:v,qty:"1",swarm_status:"",old_queen_location:"",new_hive_name:"",new_hive_apiary_id:""}; set("actions",a); }} options={ACTION_TYPES} placeholder="Select type..."/>
+                <DDSelect value={act.type} onChange={v=>{ const a=[...form.actions]; a[ai]={...a[ai],type:v,qty:"1",swarm_status:"",old_queen_location:"",old_queen_target_hive_id:"",old_queen_target_hive_name:"",old_queen_hive_number:"",new_hive_name:"",new_hive_apiary_id:""}; set("actions",a); }} options={ACTION_TYPES} placeholder="Select type..."/>
               </Field>
               {SUPER_CHANGE_ACTIONS.includes(act.type)&&(
                 <Field label="How many supers?">
@@ -1963,7 +1978,7 @@ const InspectionForm = ({ hive, existing, onSave, onNavigate, onMarkTreatmentCom
                 </div>
               )}
               {SWARM_SPLIT_ACTIONS.includes(act.type)&&(
-                <SwarmSplitFields act={act} ai={ai} actions={form.actions} setActions={v=>set("actions",v)} apiaries={apiaries} currentApiaryId={hive.apiaryId}/>
+                <SwarmSplitFields act={act} ai={ai} actions={form.actions} setActions={v=>set("actions",v)} apiaries={apiaries} currentApiaryId={hive.apiaryId} hives={hives} currentHiveId={hive.id}/>
               )}
               {act.type==="Move Hive"&&(
                 <MoveHiveFields act={act} ai={ai} actions={form.actions} setActions={v=>set("actions",v)} apiaries={apiaries} currentApiaryId={hive.apiaryId}/>
@@ -2085,7 +2100,7 @@ const InspectionView = ({ hive, inspection, onNavigate, onDelete }) => {
     <PageWrap>
       {modal==="delete"&&<ConfirmModal title="Delete this log entry?" message="Permanently remove this inspection record. This cannot be undone." confirmLabel="Yes, Delete" confirmColor={C.red} onConfirm={()=>{ setModal(null); onDelete&&onDelete(hive.id,inspection.id); onNavigate("hive-detail",{hiveId:hive.id}); }} onCancel={()=>setModal(null)}/>}
       <PageHeader title={fmtDate(inspection.date)} subtitle={hive.name} onBack={()=>onNavigate("hive-detail",{hiveId:hive.id})}
-        rightSlot={<CogMenu items={cogItems} iconColor="#fff"/>}/>
+        rightSlot={<CogMenu items={cogItems} iconColor={C.textSecondary}/>}/>
       <div style={{ padding:16 }}>
         {inspection.notes&&(<Card style={{ marginBottom:12,background:`rgba(${hexToRgb(C.primary)},.04)`,border:`1.5px solid rgba(${hexToRgb(C.primary)},.25)` }}><div style={{ fontWeight:700,color:C.primary,fontSize:15,marginBottom:6 }}>Notes</div><div style={{ fontSize:16,color:C.textPrimary,lineHeight:1.6 }}>{inspection.notes}</div></Card>)}
         <Card style={{ marginBottom:12 }}>
@@ -2124,7 +2139,7 @@ const InspectionView = ({ hive, inspection, onNavigate, onDelete }) => {
               <div key={act.id||i} style={{ marginBottom:i<inspection.actions.length-1?12:0,paddingBottom:i<inspection.actions.length-1?12:0,borderBottom:i<inspection.actions.length-1?`1px solid ${C.border}`:"none" }}>
                 <div style={{ fontSize:15,fontWeight:600,color:C.orange }}>{act.type}</div>
                 {act.swarm_status&&<div style={{ fontSize:14,color:act.swarm_status==="Queenless"?C.red:C.orange,marginTop:2 }}>Hive: {act.swarm_status}</div>}
-                {act.old_queen_location&&<div style={{ fontSize:14,color:C.textMuted,marginTop:2 }}>Old queen: {act.old_queen_location}{act.old_queen_hive_number?" ("+act.old_queen_hive_number+")":""}</div>}
+                {act.old_queen_location&&<div style={{ fontSize:14,color:C.textMuted,marginTop:2 }}>Old queen: {act.old_queen_location==="Hive Number"&&(act.old_queen_target_hive_name||act.old_queen_hive_number)?`Hive Number (${act.old_queen_target_hive_name||act.old_queen_hive_number})`:act.old_queen_location}</div>}
                 {act.details&&<div style={{ fontSize:14,color:C.textSecondary,marginTop:3,lineHeight:1.4 }}>{act.details}</div>}
               </div>
             ))}
@@ -2152,7 +2167,7 @@ const TreatmentForm = ({ hive, existing, onSave, onUpdate, onDelete, onNavigate 
     <PageWrap>
       {modal==="delete"&&<ConfirmModal title="Delete this treatment?" message="Permanently remove this treatment record. This cannot be undone." confirmLabel="Yes, Delete" confirmColor={C.red} onConfirm={()=>{ setModal(null); onDelete&&onDelete(hive.id,existing.id); onNavigate("hive-detail",{hiveId:hive.id}); }} onCancel={()=>setModal(null)}/>}
       <PageHeader title={existing?"Edit Treatment":"Log Treatment"} subtitle={hive.name} onBack={()=>onNavigate("hive-detail",{hiveId:hive.id})}
-        rightSlot={cogItems?<CogMenu items={cogItems} iconColor="#fff"/>:null}/>
+        rightSlot={cogItems?<CogMenu items={cogItems} iconColor={C.textSecondary}/>:null}/>
       <div style={{ padding:16 }}>
         <Card style={{ marginBottom:12 }}>
           <Field label="Product"><Input value={form.product} onChange={v=>set("product",v)} placeholder="e.g. Apivar, OAV"/></Field>
@@ -2220,7 +2235,7 @@ const ActionForm = ({ hive, existing, onSave, onUpdate, onDelete, onNavigate, ap
     <PageWrap>
       {modal==="delete"&&<ConfirmModal title="Delete this action?" message="Permanently remove this action record. This cannot be undone." confirmLabel="Yes, Delete" confirmColor={C.red} onConfirm={()=>{ setModal(null); onDelete&&onDelete(hive.id,existing.id); onNavigate("hive-detail",{hiveId:hive.id}); }} onCancel={()=>setModal(null)}/>}
       <PageHeader title={existing?"Edit Action":"Log Action"} subtitle={hive.name} onBack={()=>onNavigate("hive-detail",{hiveId:hive.id})}
-        rightSlot={cogItems?<CogMenu items={cogItems} iconColor="#fff"/>:null}/>
+        rightSlot={cogItems?<CogMenu items={cogItems} iconColor={C.textSecondary}/>:null}/>
       <div style={{ padding:16 }}>
         <Card style={{ marginBottom:12 }}>
           <Field label="Date"><Input type="date" value={form.date} onChange={v=>set("date",v)}/></Field>
@@ -2682,7 +2697,7 @@ const BeekeeperInfo = ({ onBack }) => {
 // ── Data Transfer Page ──────────────────────────────────────────────────────
 // APP_VERSION bumped here whenever the data schema changes — exported files carry it
 const APP_VERSION = 9;
-const APP_DISPLAY_VERSION = "v1.8.0";
+const APP_DISPLAY_VERSION = "v1.8.1";
 
 const DataTransfer = ({ hives, apiaries, activeApiaryId, equipManual, honeyHarvests, onImport, onBack }) => {
   const [importStatus,setImportStatus]=useState("");
@@ -3299,9 +3314,16 @@ export default function App() {
   };
 
   const saveInspection=(hiveId,ins,newHivesToAdd=[])=>{
-    // Collect side-effects before setHives so we can act on them after
+    // Collect side-effects before setHives so we can act on them after. Side effects
+    // that create/modify records only fire for brand-new inspections, matching the
+    // action-processing guard inside the setHives updater below.
+    const sourceHiveBeforeSave=hives.find(h=>h.id===hiveId);
+    const isNewInspection=!(sourceHiveBeforeSave&&sourceHiveBeforeSave.inspections.some(i=>i.id===ins.id));
     let moveTarget=null, newApiaryFromMove=null, soldGivenAway=false, soldDetails=null;
-    if(ins.actions){
+    // Swarm/Split: if the old (aged) queen went to another EXISTING hive tracked in
+    // BeeMark (rather than a brand-new nuc), carry her queen_since over to it.
+    let queenTransferTargetId=null, queenTransferSince=null;
+    if(isNewInspection && ins.actions){
       ins.actions.forEach(act=>{
         if(act.type==="Move Hive"&&act.move_target_id){
           if(act.move_target_id==="__new__"){
@@ -3315,6 +3337,10 @@ export default function App() {
         if(act.type==="Sold/Given Away"){
           soldGivenAway=true;
           soldDetails={transferred_to:act.transferred_to||"",transfer_notes:act.transfer_notes||act.details||""};
+        }
+        if(SWARM_SPLIT_ACTIONS.includes(act.type)&&act.old_queen_location==="Hive Number"&&act.old_queen_target_hive_id){
+          queenTransferTargetId=act.old_queen_target_hive_id;
+          queenTransferSince=sourceHiveBeforeSave?.queen_since||"";
         }
       });
     }
@@ -3344,7 +3370,7 @@ export default function App() {
           const actionList = ins.actions||[];
           actionList.forEach(act=>{
             if(act.type){
-              interventions=[...interventions,{id:act.id||uid(),type:act.type,qty:act.qty||"1",details:act.details||"",swarm_status:act.swarm_status||"",old_queen_location:act.old_queen_location||"",date:ins.date,source:"inspection"}];
+              interventions=[...interventions,{id:act.id||uid(),type:act.type,qty:act.qty||"1",details:act.details||"",swarm_status:act.swarm_status||"",old_queen_location:act.old_queen_location||"",old_queen_target_hive_id:act.old_queen_target_hive_id||"",old_queen_target_hive_name:act.old_queen_target_hive_name||"",old_queen_hive_number:act.old_queen_hive_number||"",date:ins.date,source:"inspection"}];
               hiveUpdate = applyActionToHive(hiveUpdate, act.type, act.qty||"1");
               // Update hive status for swarm/split
               if(act.swarm_status==="Queenless") hiveUpdate={...hiveUpdate,status:"Queenless"};
@@ -3412,6 +3438,8 @@ export default function App() {
       });
       // Add any new hives created by swarm/split
       if(newHivesToAdd.length>0) updated=[...updated,...newHivesToAdd];
+      // Carry the old queen's age over to the existing hive she was transferred to
+      if(queenTransferTargetId) updated=updated.map(h=>h.id===queenTransferTargetId?{...h,queen_since:queenTransferSince||""}:h);
       return updated;
     });
     // Add new apiary created by "Move to New Apiary"
@@ -3527,8 +3555,8 @@ export default function App() {
   else if(screen==="add-hive")        content=<HiveForm apiaryId={currentApiaryId} allHives={hives} onSave={saveHive} onNavigate={navigate}/>;
   else if(screen==="edit-hive")       { const h=getHive(params.hiveId); if(h) content=<HiveForm existing={h} apiaryId={currentApiaryId} allHives={hives} onSave={saveHive} onNavigate={navigate}/>; }
   else if(screen==="hive-detail")     { const h=getHive(params.hiveId); if(h) content=<HiveDetail hive={h} onNavigate={navigate} onDelete={deleteHive} onArchive={archiveHive} onRestore={restoreHive} onToggleTreatment={toggleTreatmentComplete} onToggleFeeder={toggleFeederActive} onDeleteTreatment={deleteTreatment} onDeleteIntervention={deleteIntervention}/>; }
-  else if(screen==="add-inspection")  { const h=getHive(params.hiveId); if(h) content=<InspectionForm hive={h} onSave={saveInspection} onNavigate={navigate} onMarkTreatmentComplete={markTreatmentComplete} apiaries={apiaries}/>; }
-  else if(screen==="edit-inspection") { const h=getHive(params.hiveId); const ins=h&&h.inspections.find(i=>i.id===params.inspectionId); if(h&&ins) content=<InspectionForm hive={h} existing={ins} onSave={saveInspection} onNavigate={navigate} onMarkTreatmentComplete={markTreatmentComplete} apiaries={apiaries}/>; }
+  else if(screen==="add-inspection")  { const h=getHive(params.hiveId); if(h) content=<InspectionForm hive={h} onSave={saveInspection} onNavigate={navigate} onMarkTreatmentComplete={markTreatmentComplete} apiaries={apiaries} hives={hives}/>; }
+  else if(screen==="edit-inspection") { const h=getHive(params.hiveId); const ins=h&&h.inspections.find(i=>i.id===params.inspectionId); if(h&&ins) content=<InspectionForm hive={h} existing={ins} onSave={saveInspection} onNavigate={navigate} onMarkTreatmentComplete={markTreatmentComplete} apiaries={apiaries} hives={hives}/>; }
   else if(screen==="log-weight")       { const h=getHive(params.hiveId); if(h) content=<WeightLog hive={h} onSave={saveInspection} onNavigate={navigate}/>; }
   else if(screen==="edit-weight")     { const h=getHive(params.hiveId); const ins=h&&h.inspections.find(i=>i.id===params.inspectionId); if(h&&ins) content=<WeightLog hive={h} existing={ins} onSave={saveInspection} onNavigate={navigate}/>; }
   else if(screen==="view-inspection") { const h=getHive(params.hiveId); const ins=h&&h.inspections.find(i=>i.id===params.inspectionId); if(h&&ins) content=<InspectionView hive={h} inspection={ins} onNavigate={navigate} onDelete={deleteInspection}/>; }
