@@ -31,6 +31,27 @@ const WARNING_B64 = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAgAAAAIACAYAA
 const PEN_B64     = "data:image/png;base64,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";
 
 const fmtDate = iso => { if(!iso) return "—"; const [y,m,d]=iso.split("-"); return `${d}/${m}/${y.slice(2)}`; };
+// Queen age, in whole years + months, from the date she was introduced/spotted
+const queenAgeYM = iso => {
+  if(!iso) return null;
+  const start=new Date(iso), now=new Date();
+  if(isNaN(start.getTime())||start>now) return null;
+  let months=(now.getFullYear()-start.getFullYear())*12+(now.getMonth()-start.getMonth());
+  if(now.getDate()<start.getDate()) months--;
+  if(months<0) months=0;
+  const years=Math.floor(months/12), remMonths=months%12;
+  return {years,months:remMonths,totalMonths:months};
+};
+const fmtQueenAge = iso => {
+  const age=queenAgeYM(iso);
+  if(!age) return "—";
+  const {years,months}=age;
+  if(years===0&&months===0) return "Under 1 month";
+  const parts=[];
+  if(years>0) parts.push(`${years} yr${years!==1?"s":""}`);
+  if(months>0) parts.push(`${months} mo${months!==1?"s":""}`);
+  return parts.join(" ");
+};
 const treatmentDaysLeft = t => {
   if(!t.duration_days||t.complete) return null;
   const diff=Math.ceil((new Date(t.date).getTime()+Number(t.duration_days)*86400000-Date.now())/86400000);
@@ -62,8 +83,10 @@ const INSPECTION_DEFAULTS = {
   // actions is now an array of action objects
   has_action:"",actions:[],
   has_treatment:"",treatment_product:"",treatment_reason:"",treatment_date:"",treatment_duration:"",
+  do_not_inspect:false,do_not_inspect_weeks:"1",do_not_inspect_reason:"",
   notes:"",weight_kg:"",
 };
+const DO_NOT_INSPECT_WEEK_OPTIONS = ["1","2","3","4"];
 // Default empty action entry
 const emptyAction = () => ({id:uid(),type:"",qty:"1",details:"",swarm_status:"",old_queen_location:"",old_queen_hive_number:"",new_hive_name:"",new_hive_apiary_id:""});
 const ACTION_TYPES = ["Artificial Swarm","Split","Added Queen","Removed Queen","Clipped Queen","Added Queen Cell","Added Super","Removed Super","Added Brood Box","Removed Brood Box","Frame of Eggs Added","Frame of Eggs Removed","Feed","Remove Feeder","Move Hive","Combine Hive","Shake Out","Sold/Given Away","Other"];
@@ -72,6 +95,13 @@ const SUPER_CHANGE_ACTIONS = ["Added Super","Removed Super"];
 const BOX_CHANGE_ACTIONS   = ["Added Brood Box","Removed Brood Box"];
 const SUPER_QTY_OPTIONS    = ["1","2","3","4"];
 
+// "Do not inspect" — active if a future/today skip-until date is set on the hive
+const hasActiveSkip = (hive) => {
+  if(!hive.skip_inspection_until) return false;
+  const today=new Date(); today.setHours(0,0,0,0);
+  const until=new Date(hive.skip_inspection_until);
+  return until>=today;
+};
 // Check if a hive has an active feed action (no matching "Remove Feeder" after it)
 const hasActiveFeeder = (hive) => {
   const ivs = (hive.interventions||[]).slice().sort((a,b)=>new Date(a.date)-new Date(b.date));
@@ -251,6 +281,7 @@ const Icon = ({ name, size=22, color="currentColor", style={} }) => {
     shed:    `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="${c}" stroke-width="2"><rect x="2" y="7" width="20" height="15" rx="1"/><path d="M1 7l11-5 11 5"/><line x1="9" y1="22" x2="9" y2="14"/><line x1="15" y1="22" x2="15" y2="14"/><rect x="9" y="14" width="6" height="8"/></svg>`,
     location:`<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="${c}" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>`,
     honeypot:`<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="${c}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7.5 8.5h9l-1.1 11a2 2 0 0 1-2 1.8h-2.8a2 2 0 0 1-2-1.8l-1.1-11z"/><path d="M6.5 5.5h11"/><rect x="9" y="3" width="6" height="2.3" rx="0.6"/><path d="M8.3 12h7.4"/><path d="M8.7 15.3h6.6"/></svg>`,
+    kofi:    `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none"><path d="M4 7h13a2 2 0 0 1 2 2v6a5 5 0 0 1-5 5H9a5 5 0 0 1-5-5V7z" fill="${c}"/><path d="M19 9h1.5a2.5 2.5 0 0 1 0 5H19" stroke="${c}" stroke-width="1.8" fill="none" stroke-linecap="round"/><path d="M8.2 10.3c.9-1.1 2.7-.7 2.8.7.1-1.4 1.9-1.8 2.8-.7.9 1.1.1 2.5-1 3.5l-1.8 1.6-1.8-1.6c-1.1-1-1.9-2.4-1-3.5z" fill="#FF5E5B"/></svg>`,
   };
   return <span style={{ display:"inline-flex",alignItems:"center",...style }} dangerouslySetInnerHTML={{ __html:icons[name]||icons.hive }}/>;
 };
@@ -662,11 +693,28 @@ const nextColor = (usedColors) => {
   const used = new Set(usedColors);
   const unused=COLOR_PALETTE.find(c=>!used.has(c)); if(unused) return unused; return COLOR_PALETTE[usedColors.length%COLOR_PALETTE.length]||COLOR_PALETTE[0];
 };
-// Hive-only colour palette — same as COLOR_PALETTE plus yellow. Apiaries keep COLOR_PALETTE only.
-const HIVE_COLOR_PALETTE = [...COLOR_PALETTE, "#FDD835"];
+// Hive-only colour palette — 12 clearly distinguishable standard colours, spread evenly
+// around the hue wheel so no two are easily confused. Includes all the classic named
+// colours (red, orange, yellow, green, blue, purple, pink) plus five more common hues.
+// Apiaries keep COLOR_PALETTE only.
+const HIVE_COLOR_PALETTE = ["#E53935","#FB8C00","#FDD835","#7CB342","#43A047","#00897B","#00ACC1","#1E88E5","#3949AB","#8E24AA","#D81B60","#6D4C41"];
 const nextHiveColor = (usedColors) => {
   const used = new Set(usedColors);
   const unused=HIVE_COLOR_PALETTE.find(c=>!used.has(c)); if(unused) return unused; return HIVE_COLOR_PALETTE[usedColors.length%HIVE_COLOR_PALETTE.length]||HIVE_COLOR_PALETTE[0];
+};
+// One-time migration: reassign every hive a colour from the new distinguishable palette,
+// keeping colours unique within each apiary wherever possible. Runs once per device
+// (guarded by the "bm_palette_migrated_v2" flag) so hives keep whatever colour they're
+// given afterwards — this only touches hives carried over from the old palette.
+const remapHivesToNewColorPalette = (hivesList) => {
+  const usedByApiary = {};
+  return hivesList.map(h=>{
+    const key = h.apiaryId||"__none__";
+    const used = usedByApiary[key]||[];
+    const newColor = nextHiveColor(used);
+    usedByApiary[key] = [...used, newColor];
+    return {...h, color:newColor};
+  });
 };
 
 // ── Apiary Edit Form ──────────────────────────────────────────────────────
@@ -982,8 +1030,10 @@ const HiveList = ({ hives, apiaries, activeApiaryId, onSelectApiary, onNavigate,
   const filterOpts=["All Active","Queenless","Requeening","Archived"];
   const preFiltered=filter==="All Active"?rawHives.filter(h=>h.status!=="Archived"):rawHives.filter(h=>h.status===filter);
 
-  // Sort: custom order first, then alpha-numeric
+  // Sort: Archived filter always shows most-recently-archived first; otherwise
+  // custom order first, then alpha-numeric.
   const sorted=preFiltered.slice().sort((a,b)=>{
+    if(filter==="Archived") return new Date(b.archivedAt||0)-new Date(a.archivedAt||0);
     if(customOrder&&customOrder.length){
       const ia=customOrder.indexOf(a.id), ib=customOrder.indexOf(b.id);
       if(ia!==-1&&ib!==-1) return ia-ib;
@@ -992,7 +1042,7 @@ const HiveList = ({ hives, apiaries, activeApiaryId, onSelectApiary, onNavigate,
     return alphaNumSort(a.name,b.name);
   });
 
-  const needsInspection=rawHives.filter(h=>h.status!=="Archived"&&(!h.inspections.length||(Date.now()-new Date(Math.max(...h.inspections.map(i=>new Date(i.date)))))/86400000>14));
+  const needsInspection=rawHives.filter(h=>h.status!=="Archived"&&!hasActiveSkip(h)&&(!h.inspections.length||(Date.now()-new Date(Math.max(...h.inspections.map(i=>new Date(i.date)))))/86400000>14));
 
   const cogMenuItems = [
     { label:"Add Hive", icon:<Icon name="plus" color={accent} size={16}/>, onClick:()=>onNavigate("add-hive") },
@@ -1119,6 +1169,7 @@ const HiveList = ({ hives, apiaries, activeApiaryId, onSelectApiary, onNavigate,
                   <div style={{ fontSize:14,color:C.textMuted }}>{hiveTypeLabelWithLocation(hive)}</div>
                   {(()=>{
                     const isFeeding=hasActiveFeeder(hive);
+                    const skipActive=hasActiveSkip(hive);
                     return (
                     <div style={{ display:"flex",gap:8,marginTop:6,flexWrap:"wrap",alignItems:"center" }}>
                       <span style={{ fontSize:13,color:C.textMuted }}>{hive.inspections.length+" log"+(hive.inspections.length!==1?"s":"")}</span>
@@ -1126,6 +1177,7 @@ const HiveList = ({ hives, apiaries, activeApiaryId, onSelectApiary, onNavigate,
                       {minDays!==null&&<span style={{ fontSize:13,fontWeight:600,color:C.orange,background:`rgba(${hexToRgb(C.orange)},.1)`,borderRadius:6,padding:"2px 8px" }}>{"Treatment: "+minDays+"d left"}</span>}
                       {hasOverdueTreat&&minDays===null&&<span style={{ fontSize:13,fontWeight:600,color:C.red,background:`rgba(${hexToRgb(C.red)},.08)`,borderRadius:6,padding:"2px 8px" }}>Treatment overdue</span>}
                       {isFeeding&&!hive.isNuc&&<span style={{ fontSize:13,fontWeight:600,color:C.blue,background:`rgba(${hexToRgb(C.blue)},.1)`,borderRadius:6,padding:"2px 8px" }}>Feeding</span>}
+                      {skipActive&&<span style={{ fontSize:13,fontWeight:600,color:C.textSecondary,background:`rgba(${hexToRgb(C.textMuted)},.15)`,borderRadius:6,padding:"2px 8px" }}>{"Do not inspect until "+fmtDate(hive.skip_inspection_until)}</span>}
                     </div>
                     );
                   })()}
@@ -1162,6 +1214,7 @@ const HiveDetail = ({ hive, onNavigate, onDelete, onArchive, onRestore, onToggle
   const cogItems=[
     { label:"Edit Hive",  icon:<Icon name="edit" color={C.textSecondary} size={16}/>, onClick:()=>onNavigate("edit-hive",{hiveId:hive.id}) },
     { label:"Log Weight", icon:<Icon name="inspect" color={C.accent} size={16}/>, onClick:()=>onNavigate("log-weight",{hiveId:hive.id}) },
+    { label:"Weight Tracking", icon:<Icon name="honeypot" color={C.honey} size={16}/>, onClick:()=>onNavigate("weight-tracking",{hiveId:hive.id}) },
     ...(!isArchived?[{ label:"Archive", icon:<Icon name="archive" color={C.orange} size={16}/>, onClick:()=>setModal("archive") }]:[]),
     ...(isArchived?[{ label:"Restore",  icon:<Icon name="restore" color={C.primary} size={16}/>, onClick:()=>onRestore(hive.id) }]:[]),
     "divider",
@@ -1201,6 +1254,7 @@ const HiveDetail = ({ hive, onNavigate, onDelete, onArchive, onRestore, onToggle
         {tab==="overview"&&(
           <div>
             {isArchived&&(<div style={{ background:`rgba(${hexToRgb(C.textMuted)},.1)`,border:`1.5px solid rgba(${hexToRgb(C.textMuted)},.3)`,borderRadius:12,padding:"12px 16px",marginBottom:14,display:"flex",alignItems:"center",gap:10 }}><Icon name="archive" color={C.textMuted} size={18}/><div><div style={{ fontWeight:600,color:C.textSecondary,fontSize:15 }}>Archived hive position</div><div style={{ fontSize:13,color:C.textMuted }}>Use the ⚙ menu to restore.</div></div></div>)}
+            {!isArchived&&hasActiveSkip(hive)&&(<div style={{ background:`rgba(${hexToRgb(C.textMuted)},.12)`,border:`1.5px solid rgba(${hexToRgb(C.textMuted)},.3)`,borderRadius:12,padding:"12px 16px",marginBottom:14,display:"flex",alignItems:"center",gap:10 }}><Icon name="warn" color={C.textSecondary} size={18}/><div><div style={{ fontWeight:600,color:C.textSecondary,fontSize:15 }}>{"Do not inspect until "+fmtDate(hive.skip_inspection_until)}</div>{hive.skip_inspection_reason&&<div style={{ fontSize:13,color:C.textMuted }}>{hive.skip_inspection_reason}</div>}</div></div>)}
             <InspectionSummaryBar ins={lastIns}/>
             {!lastIns&&<Card style={{ marginBottom:14,background:"#FFF8E1",border:`1.5px solid rgba(${hexToRgb(C.orange)},.3)` }}><div style={{ fontSize:15,color:C.orange,fontWeight:600 }}>No inspections yet</div><div style={{ fontSize:14,color:C.textMuted,marginTop:2 }}>Tap Inspect to start tracking.</div></Card>}
             <Card style={{ marginBottom:14,background:C.surfaceAlt }}>
@@ -1209,7 +1263,7 @@ const HiveDetail = ({ hive, onNavigate, onDelete, onArchive, onRestore, onToggle
                 const isQueenless=hive.status==="Queenless"||hive.status==="Requeening";
                 const qeVal=hive.queen_excluder?"Yes":"No";
 const baseFields=[{label:"Type",value:hiveTypeLabel(hive)},{label:"Installed",value:fmtDate(hive.installed)},{label:"Boxes",value:String(hive.boxes??1)},{label:"Supers",value:String(hive.supers??0)+(hive.useBroodAsSuper?" (BB as super)":"")},{label:"Queen Excluder",value:qeVal},{label:"Source",value:hive.source||"—"},{label:"Location",value:hive.location||"—"}];
-                const queenFields=isQueenless?[]:[{label:"Queen Year",value:String(hive.queen_year||"—")},{label:"Queen Mark",value:hive.queen_color||"—"}];
+                const queenFields=isQueenless?[]:[{label:"Queen Year",value:String(hive.queen_year||"—")},{label:"Queen Mark",value:hive.queen_color||"—"},{label:"Queen Age",value:fmtQueenAge(hive.queen_since)}];
                 return (
                   <div style={{ display:"grid",gridTemplateColumns:"1fr 1fr",gap:10 }}>
                     {[...baseFields,...queenFields].map(f=>(
@@ -1397,6 +1451,118 @@ const baseFields=[{label:"Type",value:hiveTypeLabel(hive)},{label:"Installed",va
   );
 };
 
+// ── Weight Tracking chart — like MiniLineChart, but shades the Oct–Apr window
+// (the priority period for weight monitoring, e.g. checking winter stores) ─────
+const WeightPriorityChart = ({ points, height=190 }) => {
+  const n = points.length;
+  if(!n) return null;
+  const W=320,H=height,padL=32,padR=10,padT=12,padB=26;
+  const plotW=W-padL-padR, plotH=H-padT-padB;
+  const vals = points.map(p=>Number(p.weight)).filter(v=>Number.isFinite(v));
+  const maxV = vals.length?Math.max(...vals):1;
+  const minV = vals.length?Math.min(...vals):0;
+  const pad = Math.max((maxV-minV)*0.15,1);
+  const yMax=maxV+pad, yMin=Math.max(0,minV-pad);
+  const yRange=(yMax-yMin)||1;
+  const xStep = n>1?plotW/(n-1):0;
+  const xPos = i => padL + (n>1?i*xStep:plotW/2);
+  const yPos = v => padT + plotH - ((v-yMin)/yRange)*plotH;
+  const colW = n>1?xStep:plotW;
+  const gridLines=4;
+  const labelStep = Math.max(1,Math.ceil(n/6));
+  const isPriorityMonth = iso => { if(!iso) return false; const m=Number(iso.split("-")[1]); return m>=10||m<=4; };
+  return (
+    <div>
+      <svg viewBox={`0 0 ${W} ${H}`} style={{ width:"100%",height,display:"block" }}>
+        {points.map((p,i)=>isPriorityMonth(p.date)&&(
+          <rect key={"band"+i} x={Math.max(padL,xPos(i)-colW/2)} y={padT} width={colW} height={plotH} fill={C.accent} opacity={0.08}/>
+        ))}
+        {Array.from({length:gridLines+1}).map((_,i)=>{
+          const y=padT+(plotH/gridLines)*i;
+          const val=(yMax-((yMax-yMin)/gridLines)*i).toFixed(1);
+          return (
+            <g key={i}>
+              <line x1={padL} y1={y} x2={W-padR} y2={y} stroke={C.border} strokeWidth="1"/>
+              <text x={padL-5} y={y+3} fontSize="8" fill={C.textMuted} textAnchor="end">{val}</text>
+            </g>
+          );
+        })}
+        {(()=>{
+          const pts=points.map((p,i)=>{ const v=Number(p.weight); return Number.isFinite(v)?[xPos(i),yPos(v)]:null; });
+          let d="",started=false;
+          pts.forEach(pt=>{ if(!pt){started=false;return;} d+=(started?"L":"M")+pt[0]+","+pt[1]+" "; started=true; });
+          return (
+            <g>
+              <path d={d.trim()} fill="none" stroke={C.accent} strokeWidth="2"/>
+              {pts.map((pt,i)=>pt&&<circle key={i} cx={pt[0]} cy={pt[1]} r="2.6" fill={C.accent}/>)}
+            </g>
+          );
+        })()}
+        {points.map((p,i)=>(
+          (i%labelStep===0||i===n-1)&&<text key={i} x={xPos(i)} y={H-8} fontSize="8" fill={C.textMuted} textAnchor="middle">{fmtDate(p.date)}</text>
+        ))}
+      </svg>
+      <div style={{ display:"flex",gap:14,justifyContent:"center",marginTop:2,flexWrap:"wrap" }}>
+        <div style={{ display:"flex",alignItems:"center",gap:5 }}>
+          <div style={{ width:10,height:10,borderRadius:3,background:C.accent }}/>
+          <span style={{ fontSize:12,color:C.textMuted }}>Weight (kg)</span>
+        </div>
+        <div style={{ display:"flex",alignItems:"center",gap:5 }}>
+          <div style={{ width:10,height:10,borderRadius:3,background:C.accent,opacity:0.25 }}/>
+          <span style={{ fontSize:12,color:C.textMuted }}>Oct–Apr priority period</span>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// ── Weight Tracking page — accessed from the hive detail Cog menu ──────────
+const WeightTrackingPage = ({ hive, onNavigate }) => {
+  const weightLogs = [...hive.inspections]
+    .filter(i=>i.weight_kg!==undefined&&i.weight_kg!==null&&i.weight_kg!=="")
+    .sort((a,b)=>new Date(b.date)-new Date(a.date));
+  const last10Chron = [...weightLogs].slice(0,10).reverse();
+  const chartPoints = last10Chron.map(i=>({date:i.date,weight:Number(i.weight_kg)}));
+  return (
+    <PageWrap>
+      <PageHeader title="Weight Tracking" subtitle={hive.name} onBack={()=>onNavigate("hive-detail",{hiveId:hive.id})}/>
+      <div style={{ padding:16 }}>
+        {weightLogs.length===0?(
+          <LogoWatermark message="No weight logs yet — record a weight from an inspection or a weight-only log"/>
+        ):(
+          <>
+            <Card style={{ marginBottom:14 }}>
+              <div style={{ fontWeight:700,color:C.textPrimary,marginBottom:12,fontSize:15 }}>Last {chartPoints.length} Log{chartPoints.length!==1?"s":""}</div>
+              <WeightPriorityChart points={chartPoints}/>
+              <div style={{ fontSize:13,color:C.textMuted,marginTop:8,lineHeight:1.5 }}>
+                October to April is highlighted as the priority period for weight tracking — the months when checking winter stores matters most.
+              </div>
+            </Card>
+            <Card>
+              <div style={{ fontWeight:700,color:C.textPrimary,marginBottom:12,fontSize:15 }}>All Weight Logs</div>
+              <div style={{ overflowX:"auto" }}>
+                <table style={{ width:"100%",borderCollapse:"collapse",fontSize:14 }}>
+                  <thead><tr style={{ borderBottom:`2px solid ${C.border}` }}>
+                    <th style={{ textAlign:"left",padding:"6px 8px",color:C.textMuted,fontWeight:700,textTransform:"uppercase",letterSpacing:0.7 }}>Date</th>
+                    <th style={{ textAlign:"right",padding:"6px 8px",color:C.textMuted,fontWeight:700,textTransform:"uppercase",letterSpacing:0.7 }}>Weight</th>
+                  </tr></thead>
+                  <tbody>{weightLogs.map((i,idx)=>(
+                    <tr key={i.id} onClick={()=>onNavigate(i.weightOnly?"edit-weight":"view-inspection",{hiveId:hive.id,inspectionId:i.id})}
+                      style={{ borderBottom:idx<weightLogs.length-1?`1px solid ${C.border}`:"none",cursor:"pointer" }}>
+                      <td style={{ padding:"9px 8px",color:C.textPrimary,fontWeight:500 }}>{fmtDate(i.date)}</td>
+                      <td style={{ padding:"9px 8px",color:C.accent,fontWeight:700,textAlign:"right" }}>{i.weight_kg} kg</td>
+                    </tr>
+                  ))}</tbody>
+                </table>
+              </div>
+            </Card>
+          </>
+        )}
+      </div>
+    </PageWrap>
+  );
+};
+
 // ── Hive Form ──────────────────────────────────────────────────────────────
 const HiveForm = ({ existing, apiaryId, allHives=[], onSave, onNavigate }) => {
   const thisYear=new Date().getFullYear();
@@ -1404,7 +1570,7 @@ const HiveForm = ({ existing, apiaryId, allHives=[], onSave, onNavigate }) => {
     if(existing) return {...existing, queen_excluder: existing.queen_excluder!==undefined ? existing.queen_excluder : (Number(existing.supers)||0)>0};
     const usedColors=allHives.filter(h=>h.apiaryId===apiaryId&&h.status!=="Archived").map(h=>h.color).filter(Boolean);
     const autoColor=nextHiveColor(usedColors);
-    return {name:"",type:"National",isNuc:false,useBroodAsSuper:false,color:autoColor,location:"",status:"",installed:TODAY,source:"",queen_year:thisYear,queen_marked:false,queen_color:queenColorForYear(thisYear),boxes:1,supers:0,queen_excluder:false,notes:"",apiaryId};
+    return {name:"",type:"National",isNuc:false,useBroodAsSuper:false,color:autoColor,location:"",status:"",installed:TODAY,source:"",queen_year:thisYear,queen_marked:false,queen_color:queenColorForYear(thisYear),queen_since:TODAY,boxes:1,supers:0,queen_excluder:false,notes:"",apiaryId};
   });
   const set=(k,v)=>setForm(f=>({...f,[k]:v}));
   const handleYearChange=v=>{ set("queen_year",v); if(v&&String(v).length>=4) set("queen_color",queenColorForYear(v)); };
@@ -1448,7 +1614,7 @@ const HiveForm = ({ existing, apiaryId, allHives=[], onSave, onNavigate }) => {
             <div style={{ display:"flex",alignItems:"center",gap:10,padding:"10px 0" }}>
               <input type="checkbox" id="queenright_chk" checked={form.status!=="Queenless"&&form.status!=="Requeening"} onChange={e=>{
                 if(e.target.checked){ set("status",""); }
-                else { set("status","Queenless"); set("queen_year",""); set("queen_color",""); set("queen_marked",false); }
+                else { set("status","Queenless"); set("queen_year",""); set("queen_color",""); set("queen_marked",false); set("queen_since",""); }
               }} style={{ width:18,height:18,accentColor:C.primary,cursor:"pointer" }}/>
               <label htmlFor="queenright_chk" style={{ fontSize:16,color:C.textPrimary,cursor:"pointer",fontWeight:500 }}>Queenright</label>
             </div>
@@ -1471,6 +1637,10 @@ const HiveForm = ({ existing, apiaryId, allHives=[], onSave, onNavigate }) => {
                 <Field label="Queen Year"><Input type="number" value={form.queen_year} onChange={handleYearChange}/></Field>
                 <Field label="Mark Colour"><DDSelect value={form.queen_color} onChange={v=>{ set("queen_color",v); if(v) set("queen_marked",true); }} options={QUEEN_MARK_COLORS}/></Field>
               </div>
+              <Field label="Queen Since">
+                <Input type="date" value={form.queen_since||""} onChange={v=>set("queen_since",v)}/>
+                <div style={{ fontSize:13,color:C.textMuted,marginTop:6,lineHeight:1.5 }}>Used to track queen age ({fmtQueenAge(form.queen_since)}). Set automatically when a new queen is spotted or added — adjust here if it needs correcting.</div>
+              </Field>
               {form.queen_color&&QUEEN_MARK_HEX[form.queen_color]&&(
                 <div style={{ display:"flex",alignItems:"center",gap:8,marginBottom:12 }}>
                   <div style={{ width:24,height:24,borderRadius:6,background:QUEEN_MARK_HEX[form.queen_color],border:`2px solid ${C.border}` }}/>
@@ -1674,10 +1844,13 @@ const InspectionForm = ({ hive, existing, onSave, onNavigate, onMarkTreatmentCom
             installed:form.date,
             source:act.type+" from "+hive.name,
             apiaryId:targetApiaryId,
-            // Transfer queen info from source hive
+            // Transfer queen info from source hive — if the old (aged) queen is going to
+            // this new hive, her queen_since date carries over so her age keeps tracking
+            // correctly; otherwise this nuc starts with no queen recorded yet.
             queen_year:hive.queen_year,
             queen_color:hive.queen_color,
             queen_marked:hive.queen_marked,
+            queen_since:act.old_queen_location==="New Hive"?(hive.queen_since||""):"",
             boxes:1, supers:0, notes:"Created by "+act.type+" from "+hive.name,
             inspections:[], treatments:[], interventions:[], archive:[],
           });
@@ -1876,6 +2049,22 @@ const InspectionForm = ({ hive, existing, onSave, onNavigate, onMarkTreatmentCom
           <SectionHead label="Notes"/>
           <Field label="General Observations" style={{ marginBottom:0 }}><textarea value={form.notes} onChange={e=>set("notes",e.target.value)} placeholder="General notes..." style={{...inputBase,minHeight:80,resize:"vertical"}}/></Field>
         </Card>
+        <Card style={{ marginBottom:16 }}>
+          <SectionHead label="Scheduling"/>
+          <Field label="Do not inspect next week" style={{ marginBottom:form.do_not_inspect?14:0 }}>
+            <Toggle value={!!form.do_not_inspect} onChange={v=>{ set("do_not_inspect",v); if(v&&!form.do_not_inspect_weeks) set("do_not_inspect_weeks","1"); }} label="Skip the inspection-overdue warning for a while"/>
+          </Field>
+          {form.do_not_inspect&&(
+            <div style={{ background:C.bg,borderRadius:10,padding:12 }}>
+              <Field label="For how many weeks?">
+                <DDSelect value={form.do_not_inspect_weeks||"1"} onChange={v=>set("do_not_inspect_weeks",v)} options={DO_NOT_INSPECT_WEEK_OPTIONS.map(w=>({val:w,label:`${w} week${w!=="1"?"s":""}`}))} placeholder="Select weeks..."/>
+              </Field>
+              <Field label="Reason" style={{ marginBottom:0 }}>
+                <Input value={form.do_not_inspect_reason||""} onChange={v=>set("do_not_inspect_reason",v)} placeholder="e.g. Cold snap, leave them be"/>
+              </Field>
+            </div>
+          )}
+        </Card>
         <Btn onClick={doSave} style={{ width:"100%",justifyContent:"center" }}><Icon name="check" size={17} color="#fff"/> {existing?"Update Inspection":"Save Inspection"}</Btn>
       </div>
     </PageWrap>
@@ -1896,7 +2085,7 @@ const InspectionView = ({ hive, inspection, onNavigate, onDelete }) => {
     <PageWrap>
       {modal==="delete"&&<ConfirmModal title="Delete this log entry?" message="Permanently remove this inspection record. This cannot be undone." confirmLabel="Yes, Delete" confirmColor={C.red} onConfirm={()=>{ setModal(null); onDelete&&onDelete(hive.id,inspection.id); onNavigate("hive-detail",{hiveId:hive.id}); }} onCancel={()=>setModal(null)}/>}
       <PageHeader title={fmtDate(inspection.date)} subtitle={hive.name} onBack={()=>onNavigate("hive-detail",{hiveId:hive.id})}
-        right={<CogMenu items={cogItems} iconColor="#fff"/>}/>
+        rightSlot={<CogMenu items={cogItems} iconColor="#fff"/>}/>
       <div style={{ padding:16 }}>
         {inspection.notes&&(<Card style={{ marginBottom:12,background:`rgba(${hexToRgb(C.primary)},.04)`,border:`1.5px solid rgba(${hexToRgb(C.primary)},.25)` }}><div style={{ fontWeight:700,color:C.primary,fontSize:15,marginBottom:6 }}>Notes</div><div style={{ fontSize:16,color:C.textPrimary,lineHeight:1.6 }}>{inspection.notes}</div></Card>)}
         <Card style={{ marginBottom:12 }}>
@@ -1963,7 +2152,7 @@ const TreatmentForm = ({ hive, existing, onSave, onUpdate, onDelete, onNavigate 
     <PageWrap>
       {modal==="delete"&&<ConfirmModal title="Delete this treatment?" message="Permanently remove this treatment record. This cannot be undone." confirmLabel="Yes, Delete" confirmColor={C.red} onConfirm={()=>{ setModal(null); onDelete&&onDelete(hive.id,existing.id); onNavigate("hive-detail",{hiveId:hive.id}); }} onCancel={()=>setModal(null)}/>}
       <PageHeader title={existing?"Edit Treatment":"Log Treatment"} subtitle={hive.name} onBack={()=>onNavigate("hive-detail",{hiveId:hive.id})}
-        right={cogItems?<CogMenu items={cogItems} iconColor="#fff"/>:null}/>
+        rightSlot={cogItems?<CogMenu items={cogItems} iconColor="#fff"/>:null}/>
       <div style={{ padding:16 }}>
         <Card style={{ marginBottom:12 }}>
           <Field label="Product"><Input value={form.product} onChange={v=>set("product",v)} placeholder="e.g. Apivar, OAV"/></Field>
@@ -2031,7 +2220,7 @@ const ActionForm = ({ hive, existing, onSave, onUpdate, onDelete, onNavigate, ap
     <PageWrap>
       {modal==="delete"&&<ConfirmModal title="Delete this action?" message="Permanently remove this action record. This cannot be undone." confirmLabel="Yes, Delete" confirmColor={C.red} onConfirm={()=>{ setModal(null); onDelete&&onDelete(hive.id,existing.id); onNavigate("hive-detail",{hiveId:hive.id}); }} onCancel={()=>setModal(null)}/>}
       <PageHeader title={existing?"Edit Action":"Log Action"} subtitle={hive.name} onBack={()=>onNavigate("hive-detail",{hiveId:hive.id})}
-        right={cogItems?<CogMenu items={cogItems} iconColor="#fff"/>:null}/>
+        rightSlot={cogItems?<CogMenu items={cogItems} iconColor="#fff"/>:null}/>
       <div style={{ padding:16 }}>
         <Card style={{ marginBottom:12 }}>
           <Field label="Date"><Input type="date" value={form.date} onChange={v=>set("date",v)}/></Field>
@@ -2209,6 +2398,7 @@ const AboutPage = ({ onBack }) => (
       <div style={{ display:"flex",justifyContent:"center",marginBottom:24 }}>
         <a href="https://ko-fi.com/dewberryworks" target="_blank" rel="noopener noreferrer"
           style={{ display:"inline-flex",alignItems:"center",gap:10,background:"#FF5E5B",color:"#fff",borderRadius:12,padding:"14px 28px",textDecoration:"none",fontFamily:"'Roboto',sans-serif",fontWeight:700,fontSize:17,boxShadow:"0 4px 16px rgba(255,94,91,.35)" }}>
+          <Icon name="kofi" size={22} color="#fff"/>
           <span>Buy me a coffee</span>
         </a>
       </div>
@@ -2491,8 +2681,8 @@ const BeekeeperInfo = ({ onBack }) => {
 
 // ── Data Transfer Page ──────────────────────────────────────────────────────
 // APP_VERSION bumped here whenever the data schema changes — exported files carry it
-const APP_VERSION = 8;
-const APP_DISPLAY_VERSION = "v1.7.0";
+const APP_VERSION = 9;
+const APP_DISPLAY_VERSION = "v1.8.0";
 
 const DataTransfer = ({ hives, apiaries, activeApiaryId, equipManual, honeyHarvests, onImport, onBack }) => {
   const [importStatus,setImportStatus]=useState("");
@@ -2725,7 +2915,7 @@ const DataTransfer = ({ hives, apiaries, activeApiaryId, equipManual, honeyHarve
 const HoneyHarvestForm = ({ existing, onSave, onDelete, onNavigate }) => {
   const [form,setForm]=useState(()=>existing?{...existing}:{
     date_supers_removed:TODAY, date_extraction:TODAY, supers_extracted:"", frames_extracted:"",
-    weight_value:"", weight_unit:"kg", notes:"",
+    weight_value:"", weight_unit:"kg", jars_bottled:"", notes:"",
   });
   const [modal,setModal]=useState(null);
   const set=(k,v)=>setForm(f=>({...f,[k]:v}));
@@ -2769,6 +2959,9 @@ const HoneyHarvestForm = ({ existing, onSave, onDelete, onNavigate }) => {
             </div>
           )}
         </Card>
+        <Card style={{ marginBottom:12 }}>
+          <Field label="Number of Jars Bottled" style={{ marginBottom:0 }}><Input type="number" value={form.jars_bottled} onChange={v=>set("jars_bottled",v)} placeholder="e.g. 24"/></Field>
+        </Card>
         <Card style={{ marginBottom:16 }}>
           <Field label="Notes" style={{ marginBottom:0 }}><textarea value={form.notes} onChange={e=>set("notes",e.target.value)} placeholder="Any additional notes..." style={{...inputBase,minHeight:80,resize:"vertical"}}/></Field>
         </Card>
@@ -2785,6 +2978,7 @@ const HoneyHarvestPage = ({ harvests, onNavigate, onBack }) => {
   const weightSeries=chron.map(toKg);
   const xLabels=chron.map(h=>fmtDate(h.date_extraction||h.date_supers_removed));
   const totalKg=sorted.reduce((s,h)=>s+toKg(h),0);
+  const totalJars=sorted.reduce((s,h)=>s+(Number(h.jars_bottled)||0),0);
   return (
     <PageWrap>
       <PageHeader title="Honey Harvest" onBack={onBack} rightSlot={<Btn small onClick={()=>onNavigate("add-honey-harvest")}><Icon name="plus" size={14} color="#fff"/> Log</Btn>}/>
@@ -2796,7 +2990,7 @@ const HoneyHarvestPage = ({ harvests, onNavigate, onBack }) => {
             <Card style={{ marginBottom:14 }}>
               <div style={{ display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10,flexWrap:"wrap",gap:6 }}>
                 <div style={{ fontWeight:700,color:C.textPrimary,fontSize:15 }}>Total Harvested</div>
-                <div style={{ fontSize:15,fontWeight:700,color:C.honey }}>{totalKg.toFixed(1)} kg · {kgToLb(totalKg).toFixed(1)} lb</div>
+                <div style={{ fontSize:15,fontWeight:700,color:C.honey }}>{totalKg.toFixed(1)} kg · {kgToLb(totalKg).toFixed(1)} lb{totalJars>0?` · ${totalJars} jars`:""}</div>
               </div>
               <MiniLineChart series={[{label:"Weight (kg)",color:C.honey,points:weightSeries}]} xLabels={xLabels}/>
             </Card>
@@ -2813,6 +3007,7 @@ const HoneyHarvestPage = ({ harvests, onNavigate, onBack }) => {
                         <div style={{ display:"flex",gap:6,flexWrap:"wrap",marginTop:6 }}>
                           {h.supers_extracted&&<Chip label={`${h.supers_extracted} supers`} color={C.honey} small/>}
                           {h.frames_extracted&&<Chip label={`${h.frames_extracted} frames`} color={C.accent} small/>}
+                          {h.jars_bottled&&<Chip label={`${h.jars_bottled} jars`} color={C.primary} small/>}
                         </div>
                         {h.notes&&<div style={{ fontSize:14,color:C.textMuted,marginTop:6,fontStyle:"italic" }}>{h.notes}</div>}
                       </div>
@@ -2897,15 +3092,29 @@ export default function App() {
   useEffect(()=>{
     (async()=>{
       await migrateFromLocalStorage();
-      const [h,a,aid,ho,em,hh] = await Promise.all([
+      const [h,a,aid,ho,em,hh,paletteMigrated] = await Promise.all([
         idbGet("bm_hives3",[]),
         idbGet("bm_apiaries3",null),
         idbGet("bm_activeApiary3",null),
         idbGet("bm_hive_order",[]),
         idbGet("bm_equip_manual",{broodBoxes_total:0,supers_total:0,queenExcluders_total:0,nucs_total:0,nucBroodBoxes_total:0,matingNucs_total:0,feeders_total:0,roofs_total:0,floors_total:0,crownBoards_total:0}),
         idbGet("bm_honey_harvests",[]),
+        idbGet("bm_palette_migrated_v2",false),
       ]);
-      setHives(h);
+      // One-time: move every hive onto the new distinguishable 12-colour palette,
+      // and backfill Queen Since (for queen age tracking) from the Installed date
+      // for any hive that doesn't already have it recorded.
+      let migratedHives = h;
+      if(!paletteMigrated){
+        migratedHives = remapHivesToNewColorPalette(migratedHives);
+        idbSet("bm_palette_migrated_v2", true);
+      }
+      migratedHives = migratedHives.map(hv=>{
+        if(hv.queen_since) return hv;
+        if(hv.status==="Queenless") return hv;
+        return {...hv, queen_since: hv.installed||""};
+      });
+      setHives(migratedHives);
       setApiaries(a);
       setActiveApiaryId(aid);
       setHiveOrder(ho||[]);
@@ -3115,6 +3324,20 @@ export default function App() {
         const exists=h.inspections.find(i=>i.id===ins.id);
         let treatments=[...h.treatments], interventions=[...(h.interventions||[])];
         let hiveUpdate = {...h};
+        // "Do not inspect" scheduling — only applied when logging a brand-new inspection
+        // (editing a past record shouldn't retroactively change today's schedule). Setting
+        // it starts/refreshes the skip-until window; logging any other new inspection
+        // without it cancels an active warning automatically.
+        if(!exists && !ins.weightOnly){
+          if(ins.do_not_inspect){
+            const weeks=Number(ins.do_not_inspect_weeks)||1;
+            const skipDate=new Date(ins.date||TODAY);
+            skipDate.setDate(skipDate.getDate()+weeks*7);
+            hiveUpdate={...hiveUpdate,skip_inspection_until:skipDate.toISOString().split("T")[0],skip_inspection_reason:ins.do_not_inspect_reason||""};
+          } else {
+            hiveUpdate={...hiveUpdate,skip_inspection_until:"",skip_inspection_reason:""};
+          }
+        }
         if(!exists){
           if(ins.has_treatment==="yes"&&ins.treatment_product) treatments=[...treatments,{id:uid(),product:ins.treatment_product,reason:ins.treatment_reason||"",date:ins.treatment_date||ins.date,duration_days:ins.treatment_duration||"",complete:false,source:"inspection"}];
           // Handle multiple actions
@@ -3126,6 +3349,10 @@ export default function App() {
               // Update hive status for swarm/split
               if(act.swarm_status==="Queenless") hiveUpdate={...hiveUpdate,status:"Queenless"};
               else if(act.swarm_status==="Requeening") hiveUpdate={...hiveUpdate,status:"Requeening"};
+              // Swarm/Split: the old queen leaves this hive (to a new hive, another hive,
+              // or is removed) — her age no longer applies here; pending until a new
+              // queen is spotted/added.
+              if(SWARM_SPLIT_ACTIONS.includes(act.type)&&act.old_queen_location) hiveUpdate={...hiveUpdate,queen_since:""};
               // Move hive
               if(act.type==="Move Hive"&&moveTarget) hiveUpdate={...hiveUpdate,apiaryId:moveTarget,...(act.new_hive_location?.trim()?{location:act.new_hive_location.trim()}:{})};
               // Sold/given away → archive with transfer info
@@ -3142,23 +3369,31 @@ export default function App() {
           const prevIns=allIns[1];
 
           // Queen seen this inspection → mark Queenright (clear Queenless/Requeening)
+          // Queen age: a new queen spotted following Requeening/Queenless starts her age
+          // clock from this inspection date.
           if(thisIns.queen_seen==="yes" && (hiveUpdate.status==="Queenless"||hiveUpdate.status==="Requeening")){
-            const queenUpdate={status:""};
+            const queenUpdate={status:"",queen_since:thisIns.date};
             if(thisIns.new_queen_year) queenUpdate.queen_year=thisIns.new_queen_year;
             if(thisIns.new_queen_color) queenUpdate.queen_color=thisIns.new_queen_color;
             if(thisIns.new_queen_marked!==undefined) queenUpdate.queen_marked=thisIns.new_queen_marked;
             hiveUpdate={...hiveUpdate,...queenUpdate};
           }
-          // Queen cells left → Requeening
+          // Queen cells left → Requeening (current queen is gone; new queen's age is
+          // unknown/pending until she's spotted, so clear queen_since for now)
           const thisQCLeft=(thisIns.queen_cell_action==="Left in Place")||
             (thisIns.actions||[]).some(a=>(a.type==="Artificial Swarm"||a.type==="Split")&&a.swarm_status==="Requeening");
           if(thisQCLeft && hiveUpdate.status!=="Archived"){
-            hiveUpdate={...hiveUpdate,status:"Requeening"};
+            hiveUpdate={...hiveUpdate,status:"Requeening",queen_since:""};
           }
-          // Added Queen action → clear Queenless
+          // Added Queen action → clear Queenless, queen age starts today
           const hadQueenAdded=(ins.actions||[]).some(a=>a.type==="Added Queen");
-          if(hadQueenAdded && (hiveUpdate.status==="Queenless"||hiveUpdate.status==="Requeening")){
-            hiveUpdate={...hiveUpdate,status:""};
+          if(hadQueenAdded){
+            hiveUpdate={...hiveUpdate,status:(hiveUpdate.status==="Queenless"||hiveUpdate.status==="Requeening")?"":hiveUpdate.status,queen_since:ins.date};
+          }
+          // Removed Queen action → queen is gone, age pending until a new one is recorded
+          const hadQueenRemoved=(ins.actions||[]).some(a=>a.type==="Removed Queen");
+          if(hadQueenRemoved){
+            hiveUpdate={...hiveUpdate,queen_since:""};
           }
           // Auto-Queenless: queen not seen in this AND previous inspection (and no QC left previously)
           if(thisIns&&prevIns){
@@ -3186,7 +3421,14 @@ export default function App() {
     if(type==="treatment") setHives(hs=>hs.map(h=>h.id===hiveId?{...h,treatments:[...h.treatments,record]}:h));
     else if(type==="intervention") setHives(hs=>hs.map(h=>{
       if(h.id!==hiveId) return h;
-      const updated = applyActionToHive(h, record.type, record.qty||"1");
+      let updated = applyActionToHive(h, record.type, record.qty||"1");
+      // Queen age tracking for standalone (non-inspection) queen actions
+      if(record.type==="Added Queen"){
+        updated={...updated,status:(updated.status==="Queenless"||updated.status==="Requeening")?"":updated.status,queen_since:record.date||TODAY};
+      }
+      if(record.type==="Removed Queen"){
+        updated={...updated,queen_since:""};
+      }
       return {...updated, interventions:[...(h.interventions||[]),record]};
     }));
   };
@@ -3270,7 +3512,7 @@ export default function App() {
     {id:"apiary-settings", label:"Apiary", icon:"apiary-nav"},
     {id:"info-hub",        label:"Info",   icon:"info-nav"},
   ];
-  const hiveScreens=["hive-detail","add-hive","edit-hive","add-inspection","edit-inspection","view-inspection","add-treatment","edit-treatment","add-intervention","edit-intervention","log-weight","edit-weight"];
+  const hiveScreens=["hive-detail","add-hive","edit-hive","add-inspection","edit-inspection","view-inspection","add-treatment","edit-treatment","add-intervention","edit-intervention","log-weight","edit-weight","weight-tracking"];
   const hasOverdue=hives.filter(h=>h.apiaryId===currentApiaryId&&h.status!=="Archived").some(h=>{
     const last=h.inspections.slice().sort((a,b)=>new Date(b.date)-new Date(a.date))[0];
     return !last||(Date.now()-new Date(last.date))/86400000>14;
@@ -3290,6 +3532,7 @@ export default function App() {
   else if(screen==="log-weight")       { const h=getHive(params.hiveId); if(h) content=<WeightLog hive={h} onSave={saveInspection} onNavigate={navigate}/>; }
   else if(screen==="edit-weight")     { const h=getHive(params.hiveId); const ins=h&&h.inspections.find(i=>i.id===params.inspectionId); if(h&&ins) content=<WeightLog hive={h} existing={ins} onSave={saveInspection} onNavigate={navigate}/>; }
   else if(screen==="view-inspection") { const h=getHive(params.hiveId); const ins=h&&h.inspections.find(i=>i.id===params.inspectionId); if(h&&ins) content=<InspectionView hive={h} inspection={ins} onNavigate={navigate} onDelete={deleteInspection}/>; }
+  else if(screen==="weight-tracking") { const h=getHive(params.hiveId); if(h) content=<WeightTrackingPage hive={h} onNavigate={navigate}/>; }
   else if(screen==="info-hub")        content=<InfoHub hives={hives} apiaries={apiaries} onNavigate={navigate}/>;
   else if(screen==="equipment-shed")  content=<EquipmentShed hives={hives} onBack={()=>navigate("info-hub")} manualCounts={equipManual} onSetManual={handleSetManual}/>
   else if(screen==="honey-harvest")   content=<HoneyHarvestPage harvests={honeyHarvests} onNavigate={navigate} onBack={()=>navigate("info-hub")}/>
