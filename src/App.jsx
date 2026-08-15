@@ -304,6 +304,7 @@ const Icon = ({ name, size=22, color="currentColor", style={} }) => {
     location:`<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="${c}" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>`,
     honeypot:`<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="${c}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7.5 8.5h9l-1.1 11a2 2 0 0 1-2 1.8h-2.8a2 2 0 0 1-2-1.8l-1.1-11z"/><path d="M6.5 5.5h11"/><rect x="9" y="3" width="6" height="2.3" rx="0.6"/><path d="M8.3 12h7.4"/><path d="M8.7 15.3h6.6"/></svg>`,
     kofi:    `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none"><path d="M4 7h13a2 2 0 0 1 2 2v6a5 5 0 0 1-5 5H9a5 5 0 0 1-5-5V7z" fill="${c}"/><path d="M19 9h1.5a2.5 2.5 0 0 1 0 5H19" stroke="${c}" stroke-width="1.8" fill="none" stroke-linecap="round"/><path d="M8.2 10.3c.9-1.1 2.7-.7 2.8.7.1-1.4 1.9-1.8 2.8-.7.9 1.1.1 2.5-1 3.5l-1.8 1.6-1.8-1.6c-1.1-1-1.9-2.4-1-3.5z" fill="#FF5E5B"/></svg>`,
+    download:`<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="${c}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>`,
     scale:   `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="${c}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="4" width="19" height="16" rx="3"/><circle cx="12" cy="12" r="4.2"/><line x1="12" y1="9.2" x2="12" y2="12" stroke-width="1.6"/><line x1="6" y1="7" x2="7.3" y2="7.9" stroke-width="1.6"/><line x1="18" y1="7" x2="16.7" y2="7.9" stroke-width="1.6"/></svg>`,
   };
   return <span style={{ display:"inline-flex",alignItems:"center",...style }} dangerouslySetInnerHTML={{ __html:icons[name]||icons.hive }}/>;
@@ -2499,9 +2500,55 @@ const EquipmentShed = ({ hives, onBack, manualCounts, onSetManual }) => {
 
 
 // ── About Page ─────────────────────────────────────────────────────────────
-const AboutPage = ({ onBack }) => (
+// Compares "vX.Y.Z"-style version strings numerically (not lexically), so e.g.
+// v1.10.0 correctly counts as newer than v1.9.0. Returns true if `latest` > `current`.
+const isNewerVersion = (latest, current) => {
+  const parse = v => String(v||"").replace(/^v/i,"").split(".").map(n=>parseInt(n,10)||0);
+  const a=parse(latest), b=parse(current);
+  const len=Math.max(a.length,b.length);
+  for(let i=0;i<len;i++){
+    const x=a[i]||0, y=b[i]||0;
+    if(x>y) return true;
+    if(x<y) return false;
+  }
+  return false;
+};
+const GITHUB_REPO = "sdewer/BeeMark";
+
+const AboutPage = ({ onBack }) => {
+  // Android-only update check: on mount, ask GitHub for the latest release and compare
+  // it against the version baked into this build. Web builds skip this entirely — the
+  // web app is always the latest by definition (no separate "install" step).
+  const [updateInfo,setUpdateInfo]=useState(null); // {version, url} once a newer release is confirmed
+  useEffect(()=>{
+    if(!window.Capacitor?.isNativePlatform?.()) return;
+    let cancelled=false;
+    (async()=>{
+      try{
+        const res=await fetch(`https://api.github.com/repos/${GITHUB_REPO}/releases/latest`);
+        if(!res.ok) return;
+        const data=await res.json();
+        const latestVersion=data.tag_name;
+        if(!latestVersion||!isNewerVersion(latestVersion,APP_DISPLAY_VERSION)) return;
+        const apkAsset=(data.assets||[]).find(a=>a.name&&a.name.toLowerCase().endsWith(".apk"));
+        const downloadUrl=apkAsset?.browser_download_url||data.html_url;
+        if(!cancelled) setUpdateInfo({ version:latestVersion, url:downloadUrl });
+      } catch(err){
+        console.error("Update check failed:",err);
+      }
+    })();
+    return ()=>{ cancelled=true; };
+  },[]);
+  return (
   <PageWrap>
     <PageHeader title="About BeeMark" onBack={onBack}/>
+    {updateInfo&&(
+      <a href={updateInfo.url} target="_blank" rel="noopener noreferrer"
+        style={{ display:"flex",alignItems:"center",justifyContent:"center",gap:9,background:C.accent,color:"#fff",textDecoration:"none",padding:"13px 16px",fontFamily:"'Roboto',sans-serif",fontWeight:700,fontSize:15,textAlign:"center" }}>
+        <Icon name="download" size={18} color="#fff"/>
+        <span>{"Newer version available: "+updateInfo.version}</span>
+      </a>
+    )}
     <div style={{ padding:24 }}>
       <div style={{ display:"flex",flexDirection:"column",alignItems:"center",marginBottom:32 }}>
         <img src={LOGO_B64} alt="BeeMark" style={{ width:220,maxWidth:"85%" }}/>
@@ -2539,7 +2586,8 @@ const AboutPage = ({ onBack }) => (
       </Card>
     </div>
   </PageWrap>
-);
+  );
+};
 
 // ── Beekeeper Info Page ─────────────────────────────────────────────────────
 const BeekeeperInfo = ({ onBack }) => {
@@ -2807,7 +2855,7 @@ const BeekeeperInfo = ({ onBack }) => {
 // ── Data Transfer Page ──────────────────────────────────────────────────────
 // APP_VERSION bumped here whenever the data schema changes — exported files carry it
 const APP_VERSION = 9;
-const APP_DISPLAY_VERSION = "v1.9.0";
+const APP_DISPLAY_VERSION = "v1.10.0";
 
 const DataTransfer = ({ hives, apiaries, activeApiaryId, equipManual, honeyHarvests, onImport, onBack }) => {
   const [importStatus,setImportStatus]=useState("");
@@ -3217,7 +3265,7 @@ export default function App() {
   useEffect(()=>{
     (async()=>{
       await migrateFromLocalStorage();
-      const [h,a,aid,ho,em,hh,paletteMigrated] = await Promise.all([
+      const [h,a,aid,ho,em,hh,paletteMigrated,treatmentLinkMigrated] = await Promise.all([
         idbGet("bm_hives3",[]),
         idbGet("bm_apiaries3",null),
         idbGet("bm_activeApiary3",null),
@@ -3225,6 +3273,7 @@ export default function App() {
         idbGet("bm_equip_manual",{broodBoxes_total:0,supers_total:0,queenExcluders_total:0,nucs_total:0,nucBroodBoxes_total:0,matingNucs_total:0,feeders_total:0,roofs_total:0,floors_total:0,crownBoards_total:0}),
         idbGet("bm_honey_harvests",[]),
         idbGet("bm_palette_migrated_v2",false),
+        idbGet("bm_treatment_link_migrated_v1",false),
       ]);
       // One-time: move every hive onto the new distinguishable 12-colour palette,
       // and backfill Queen Since (for queen age tracking) from the Installed date
@@ -3239,6 +3288,24 @@ export default function App() {
         if(hv.status==="Queenless") return hv;
         return {...hv, queen_since: hv.installed||""};
       });
+      // One-time: link treatments that were created via an inspection (before v1.9.0 there
+      // was no direct reference between the two) back to the inspection that created them,
+      // matched on date + product — best effort, since older data has nothing more precise
+      // to go on. This lets editing an old inspection's Treatment section correctly update
+      // the matching treatment record, instead of only new inspections getting that link.
+      if(!treatmentLinkMigrated){
+        migratedHives = migratedHives.map(hv=>{
+          let treats=[...(hv.treatments||[])];
+          (hv.inspections||[]).forEach(insp=>{
+            if(insp.has_treatment!=="yes"||!insp.treatment_product) return;
+            const wantDate=insp.treatment_date||insp.date;
+            const idx=treats.findIndex(t=>!t.source_inspection_id&&t.source==="inspection"&&t.date===wantDate&&t.product===insp.treatment_product);
+            if(idx!==-1) treats[idx]={...treats[idx],source_inspection_id:insp.id};
+          });
+          return {...hv, treatments:treats};
+        });
+        idbSet("bm_treatment_link_migrated_v1", true);
+      }
       // Api-Guard 2nd tray auto-complete: checked on every load (not a one-time migration)
       // since it needs to re-evaluate as time passes. Once the 2nd tray's own 14 days have
       // elapsed, the treatment marks itself complete automatically.
@@ -3486,7 +3553,7 @@ export default function App() {
           }
         }
         if(!exists){
-          if(ins.has_treatment==="yes"&&ins.treatment_product) treatments=[...treatments,{id:uid(),product:ins.treatment_product,reason:ins.treatment_reason||"",notes:ins.treatment_notes||"",date:ins.treatment_date||ins.date,duration_days:ins.treatment_duration||"",tray:ins.treatment_product==="Api-Guard"?(ins.treatment_tray||"1st Tray"):"",complete:false,source:"inspection"}];
+          if(ins.has_treatment==="yes"&&ins.treatment_product) treatments=[...treatments,{id:uid(),product:ins.treatment_product,reason:ins.treatment_reason||"",notes:ins.treatment_notes||"",date:ins.treatment_date||ins.date,duration_days:ins.treatment_duration||"",tray:ins.treatment_product==="Api-Guard"?(ins.treatment_tray||"1st Tray"):"",complete:false,source:"inspection",source_inspection_id:ins.id}];
           // Handle multiple actions
           const actionList = ins.actions||[];
           actionList.forEach(act=>{
@@ -3593,6 +3660,31 @@ export default function App() {
             const idx=interventions.findIndex(iv=>iv.id===record.id);
             if(idx!==-1) interventions[idx]=record; else interventions=[...interventions,record];
           });
+          // Keep the treatments[] record this inspection created in sync with edits to the
+          // Treatment section — previously editing an inspection updated the log but left
+          // the separate treatment record (shown on the hive's Treatment tab) untouched.
+          // Matched via source_inspection_id, set whenever a treatment is created from an
+          // inspection (from v1.9.0 onward — older inspection-sourced treatments predate
+          // this link and are left alone here, same as any other manually-entered treatment).
+          const linkedTreatIdx=treatments.findIndex(t=>t.source_inspection_id===ins.id);
+          if(ins.has_treatment==="yes"&&ins.treatment_product){
+            const treatFields={
+              product:ins.treatment_product,
+              reason:ins.treatment_reason||"",
+              notes:ins.treatment_notes||"",
+              date:ins.treatment_date||ins.date,
+              duration_days:ins.treatment_duration||"",
+              tray:ins.treatment_product==="Api-Guard"?(ins.treatment_tray||"1st Tray"):"",
+            };
+            if(linkedTreatIdx!==-1){
+              treatments=treatments.map((t,i)=>i===linkedTreatIdx?{...t,...treatFields}:t);
+            } else {
+              treatments=[...treatments,{id:uid(),...treatFields,complete:false,source:"inspection",source_inspection_id:ins.id}];
+            }
+          } else if(linkedTreatIdx!==-1){
+            // Treatment section was cleared on this edit — remove the record it created.
+            treatments=treatments.filter((_,i)=>i!==linkedTreatIdx);
+          }
         }
         const newInspections=exists?h.inspections.map(i=>i.id===ins.id?ins:i):[...h.inspections,ins];
         return {...hiveUpdate,inspections:newInspections,treatments,interventions};
