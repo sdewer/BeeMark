@@ -57,6 +57,28 @@ const treatmentDaysLeft = t => {
   const diff=Math.ceil((new Date(t.date).getTime()+Number(t.duration_days)*86400000-Date.now())/86400000);
   return diff>0?diff:null;
 };
+// Treatment product dropdown — the three named options carry known defaults/behaviour;
+// "Other" reveals a free-text box so anything not listed can still be logged.
+const TREATMENT_PRODUCTS = ["Apivar","Api-Guard","Oxalic Acid","Other"];
+const KNOWN_TREATMENT_PRODUCTS = ["Apivar","Api-Guard","Oxalic Acid"];
+const TREATMENT_PRODUCT_INFO = {
+  "Apivar": "Amitraz strips for varroa control. Typically 2 strips per brood box (adjust for colony size). Leave in place for 42 days, then remove.",
+  "Api-Guard": "Thymol gel tray for varroa control, applied as two 14-day stages. Add the first tray, then swap in the second tray once the first has been in for 14 days. Avoid applying with honey supers on if intending to sell the honey.",
+  "Oxalic Acid": "Sublimation or trickle treatment for varroa, most effective when the colony is broodless (e.g. midwinter). Follow the product label for dosage and frequency — do not exceed the recommended number of applications.",
+};
+const API_GUARD_TRAYS = ["1st Tray","2nd Tray"];
+// Resolve a stored (possibly legacy/free-text) product string into what the Product
+// dropdown + "Other" text box should show: anything not one of the three named
+// options is treated as a custom "Other" entry, so old data still edits cleanly.
+const resolveTreatmentProductUI = rawProduct => {
+  if(!rawProduct) return {dropdownValue:"",otherText:""};
+  if(KNOWN_TREATMENT_PRODUCTS.includes(rawProduct)) return {dropdownValue:rawProduct,otherText:""};
+  return {dropdownValue:"Other",otherText:rawProduct};
+};
+// Api-Guard is applied in two 14-day stages — once the first tray's period has
+// elapsed without the treatment being marked complete, remind the beekeeper to swap
+// in the second tray (the second tray auto-completes on its own once its period ends).
+const apiGuardAwaitingSecondTray = t => t.product==="Api-Guard"&&t.tray==="1st Tray"&&!t.complete&&!!t.duration_days&&treatmentDaysLeft(t)===null;
 const frameNumeric = (val,custom) => {
   if(val===undefined||val===null||val==="") return null;
   if(val==="Other"){ const n=parseFloat(custom); return Number.isFinite(n)?n:null; }
@@ -82,7 +104,7 @@ const INSPECTION_DEFAULTS = {
   frames_brood:"",frames_brood_custom:"",frames_stores:"",frames_stores_custom:"",temperament:"",
   // actions is now an array of action objects
   has_action:"",actions:[],
-  has_treatment:"",treatment_product:"",treatment_reason:"",treatment_date:"",treatment_duration:"",
+  has_treatment:"",treatment_product:"",treatment_product_other:"",treatment_reason:"",treatment_notes:"",treatment_tray:"",treatment_date:"",treatment_duration:"",
   do_not_inspect:false,do_not_inspect_weeks:"1",do_not_inspect_reason:"",
   notes:"",weight_kg:"",
 };
@@ -1145,7 +1167,8 @@ const HiveList = ({ hives, apiaries, activeApiaryId, onSelectApiary, onNavigate,
           const lastIns=hive.inspections.slice().sort((a,b)=>new Date(b.date)-new Date(a.date))[0];
           const sc=STATUS_COLORS[hive.status]||null;
           const activeTreats=(hive.treatments||[]).filter(t=>!t.complete&&treatmentDaysLeft(t)!==null);
-          const overdueTreats=(hive.treatments||[]).filter(t=>!t.complete&&t.duration_days&&treatmentDaysLeft(t)===null);
+          const needsSecondTray=(hive.treatments||[]).some(apiGuardAwaitingSecondTray);
+          const overdueTreats=(hive.treatments||[]).filter(t=>!t.complete&&t.duration_days&&treatmentDaysLeft(t)===null&&!apiGuardAwaitingSecondTray(t));
           const minDays=activeTreats.length?Math.min(...activeTreats.map(t=>treatmentDaysLeft(t))):null;
           const hasOverdueTreat=overdueTreats.length>0;
           const hiveApiary=allMode?apiaries.find(a=>a.id===hive.apiaryId):null;
@@ -1177,6 +1200,7 @@ const HiveList = ({ hives, apiaries, activeApiaryId, onSelectApiary, onNavigate,
                       {lastIns&&<span style={{ fontSize:13,color:C.textMuted }}>{"Last: "+fmtDate(lastIns.date)}</span>}
                       {minDays!==null&&<span style={{ fontSize:13,fontWeight:600,color:C.orange,background:`rgba(${hexToRgb(C.orange)},.1)`,borderRadius:6,padding:"2px 8px" }}>{"Treatment: "+minDays+"d left"}</span>}
                       {hasOverdueTreat&&minDays===null&&<span style={{ fontSize:13,fontWeight:600,color:C.red,background:`rgba(${hexToRgb(C.red)},.08)`,borderRadius:6,padding:"2px 8px" }}>Treatment overdue</span>}
+                      {needsSecondTray&&<span style={{ fontSize:13,fontWeight:600,color:C.honey,background:`rgba(${hexToRgb(C.honey)},.14)`,borderRadius:6,padding:"2px 8px" }}>Add 2nd Api-Guard tray</span>}
                       {isFeeding&&!hive.isNuc&&<span style={{ fontSize:13,fontWeight:600,color:C.blue,background:`rgba(${hexToRgb(C.blue)},.1)`,borderRadius:6,padding:"2px 8px" }}>Feeding</span>}
                       {skipActive&&<span style={{ fontSize:13,fontWeight:600,color:C.textSecondary,background:`rgba(${hexToRgb(C.textMuted)},.15)`,borderRadius:6,padding:"2px 8px" }}>{"Do not inspect until "+fmtDate(hive.skip_inspection_until)}</span>}
                     </div>
@@ -1367,19 +1391,22 @@ const baseFields=[{label:"Type",value:hiveTypeLabel(hive)},{label:"Installed",va
               <div style={{ display:"flex",flexDirection:"column",gap:10 }}>
                 {[...hive.treatments].map((x,i)=>({...x,_idx:i})).sort((a,b)=>{ const d=new Date(b.date)-new Date(a.date); return d!==0?d:b._idx-a._idx; }).map(t=>{
                   const dLeft=treatmentDaysLeft(t);
-                  const isOverdue=!t.complete&&dLeft===null&&!!t.duration_days;
-                  const statusLabel=t.complete?"Complete":dLeft!==null?"Active":isOverdue?"Overdue":"—";
-                  const statusColor=t.complete?C.green:dLeft!==null?C.orange:isOverdue?C.red:C.textMuted;
+                  const awaitingSecondTray=apiGuardAwaitingSecondTray(t);
+                  const isOverdue=!t.complete&&dLeft===null&&!!t.duration_days&&!awaitingSecondTray;
+                  const statusLabel=t.complete?"Complete":awaitingSecondTray?"Add 2nd tray":dLeft!==null?"Active":isOverdue?"Overdue":"—";
+                  const statusColor=t.complete?C.green:awaitingSecondTray?C.honey:dLeft!==null?C.orange:isOverdue?C.red:C.textMuted;
                   return (
                     <Card key={t.id} onClick={()=>onToggleTreatment(hive.id,t.id)}
                       style={{ cursor:"pointer",borderLeft:`3px solid ${statusColor}`,paddingLeft:13 }}>
                       <div style={{ display:"flex",justifyContent:"space-between",alignItems:"flex-start" }}>
                         <div style={{ flex:1 }}>
-                          <div style={{ fontWeight:700,color:C.textPrimary }}>{t.product}</div>
+                          <div style={{ fontWeight:700,color:C.textPrimary }}>{t.product}{t.tray?" · "+t.tray:""}</div>
                           <div style={{ fontSize:14,color:C.textMuted,marginTop:2 }}>{fmtDate(t.date)+(t.reason?" · "+t.reason:"")}</div>
                           {t.duration_days&&<div style={{ fontSize:14,color:C.textMuted }}>Duration: {t.duration_days} days</div>}
+                          {t.notes&&<div style={{ fontSize:14,color:C.textMuted,marginTop:2 }}>{t.notes}</div>}
                           {t.complete&&<div style={{ fontSize:14,fontWeight:600,color:C.green,marginTop:4 }}>Treatment complete</div>}
-                          {!t.complete&&dLeft!==null&&<div style={{ fontSize:14,fontWeight:600,color:C.orange,marginTop:4 }}>{dLeft} day{dLeft!==1?"s":""} remaining</div>}
+                          {!t.complete&&awaitingSecondTray&&<div style={{ fontSize:14,fontWeight:600,color:C.honey,marginTop:4 }}>1st tray done — add the 2nd Api-Guard tray</div>}
+                          {!t.complete&&!awaitingSecondTray&&dLeft!==null&&<div style={{ fontSize:14,fontWeight:600,color:C.orange,marginTop:4 }}>{dLeft} day{dLeft!==1?"s":""} remaining</div>}
                           {isOverdue&&<div style={{ fontSize:14,fontWeight:600,color:C.red,marginTop:4 }}>Treatment overdue</div>}
                           {t.source==="inspection"&&<div style={{ fontSize:12,color:C.textMuted,marginTop:2 }}>Added via inspection</div>}
                           <div style={{ fontSize:12,color:C.textMuted,marginTop:6 }}>Tap to mark {t.complete?"active":"complete"}</div>
@@ -1830,8 +1857,12 @@ const WeightLog = ({ hive, onSave, onNavigate, existing }) => {
 };
 
 // ── Inspection Form ────────────────────────────────────────────────────────
-const InspectionForm = ({ hive, existing, onSave, onNavigate, onMarkTreatmentComplete, apiaries=[], hives=[] }) => {
-  const [form,setForm]=useState(existing||{...INSPECTION_DEFAULTS,id:uid(),date:TODAY,inspector:""});
+const InspectionForm = ({ hive, existing, onSave, onNavigate, onMarkTreatmentComplete, onAddSecondTray, apiaries=[], hives=[] }) => {
+  const [form,setForm]=useState(()=>{
+    const base = existing||{...INSPECTION_DEFAULTS,id:uid(),date:TODAY,inspector:""};
+    const {dropdownValue,otherText}=resolveTreatmentProductUI(base.treatment_product);
+    return {...base, treatment_product_select:dropdownValue, treatment_product_other:base.treatment_product_other||otherText};
+  });
   const set=(k,v)=>setForm(f=>({...f,[k]:v}));
   const seenItems=[
     {key:"queen_seen",label:"Queen",invert:false},{key:"eggs_seen",label:"Eggs",invert:false},
@@ -1841,7 +1872,13 @@ const InspectionForm = ({ hive, existing, onSave, onNavigate, onMarkTreatmentCom
   const frameOpts=hive.isNuc?NUC_FRAMES:FRAME_OPTIONS;
   const doSave=()=>{
     if(!form.date){alert("Please enter a date");return;}
-    const insRecord={...form,id:existing?existing.id:uid()};
+    // Resolve the Product dropdown (+ "Other" free text) into the final stored string,
+    // same as the standalone Treatment form.
+    const resolvedTreatmentProduct = form.has_treatment==="yes"
+      ? (form.treatment_product_select==="Other" ? (form.treatment_product_other||"").trim() : form.treatment_product_select)
+      : form.treatment_product;
+    const insRecord={...form, treatment_product:resolvedTreatmentProduct, id:existing?existing.id:uid()};
+    delete insRecord.treatment_product_select;
     // Build new hives from swarm/split actions that require a new hive
     const newHives=[];
     if(form.has_action==="yes"&&form.actions){
@@ -2032,18 +2069,28 @@ const InspectionForm = ({ hive, existing, onSave, onNavigate, onMarkTreatmentCom
         {(hive.treatments||[]).filter(t=>!t.complete&&(treatmentDaysLeft(t)!==null||t.duration_days)).length>0&&(
           <Card style={{ marginBottom:12,background:"rgba("+hexToRgb(C.orange)+",.04)",border:"1.5px solid rgba("+hexToRgb(C.orange)+",.2)" }}>
             <SectionHead label="Active Treatment"/>
-            {(hive.treatments||[]).filter(t=>!t.complete&&(treatmentDaysLeft(t)!==null||t.duration_days)).map(t=>(
+            {(hive.treatments||[]).filter(t=>!t.complete&&(treatmentDaysLeft(t)!==null||t.duration_days)).map(t=>{
+              const awaitingSecondTray=apiGuardAwaitingSecondTray(t);
+              return (
               <div key={t.id} style={{ display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8 }}>
                 <div>
-                  <div style={{ fontWeight:600,color:C.textPrimary,fontSize:15 }}>{t.product}</div>
-                  <div style={{ fontSize:13,color:C.textMuted }}>Started {fmtDate(t.date)}</div>
+                  <div style={{ fontWeight:600,color:C.textPrimary,fontSize:15 }}>{t.product}{t.tray?" · "+t.tray:""}</div>
+                  <div style={{ fontSize:13,color:C.textMuted }}>{awaitingSecondTray?"1st tray done — add the 2nd tray":"Started "+fmtDate(t.date)}</div>
                 </div>
-                <button onClick={()=>onMarkTreatmentComplete(hive.id,t.id)}
-                  style={{ background:`rgba(${hexToRgb(C.green)},.1)`,border:`1px solid ${C.green}`,borderRadius:8,padding:"6px 12px",color:C.green,fontFamily:"'Roboto',sans-serif",fontWeight:600,fontSize:14,cursor:"pointer" }}>
-                  Mark Complete
-                </button>
+                {awaitingSecondTray?(
+                  <button onClick={()=>onAddSecondTray(hive.id,t.id)}
+                    style={{ background:`rgba(${hexToRgb(C.honey)},.14)`,border:`1px solid ${C.honey}`,borderRadius:8,padding:"6px 12px",color:C.honey,fontFamily:"'Roboto',sans-serif",fontWeight:600,fontSize:14,cursor:"pointer" }}>
+                    Add 2nd Tray
+                  </button>
+                ):(
+                  <button onClick={()=>onMarkTreatmentComplete(hive.id,t.id)}
+                    style={{ background:`rgba(${hexToRgb(C.green)},.1)`,border:`1px solid ${C.green}`,borderRadius:8,padding:"6px 12px",color:C.green,fontFamily:"'Roboto',sans-serif",fontWeight:600,fontSize:14,cursor:"pointer" }}>
+                    Mark Complete
+                  </button>
+                )}
               </div>
-            ))}
+              );
+            })}
           </Card>
         )}
         <Card style={{ marginBottom:12 }}>
@@ -2051,12 +2098,20 @@ const InspectionForm = ({ hive, existing, onSave, onNavigate, onMarkTreatmentCom
           <Field label="Treatment applied?"><YesNo value={form.has_treatment} onChange={v=>set("has_treatment",v)} neutralColors/></Field>
           {form.has_treatment==="yes"&&(
             <div style={{ background:C.bg,borderRadius:10,padding:12,marginTop:8 }}>
-              <Field label="Product"><Input value={form.treatment_product} onChange={v=>set("treatment_product",v)} placeholder="e.g. Apivar, OAV"/></Field>
-              <Field label="Reason"><Input value={form.treatment_reason} onChange={v=>set("treatment_reason",v)} placeholder="Varroa, prevention..."/></Field>
-              <div style={{ display:"grid",gridTemplateColumns:"1fr 1fr",gap:10 }}>
-                <Field label="Date"><Input type="date" value={form.treatment_date||TODAY} onChange={v=>set("treatment_date",v)}/></Field>
-                <Field label="Duration (days)" style={{ marginBottom:0 }}><Input type="number" value={form.treatment_duration} onChange={v=>set("treatment_duration",v)}/></Field>
-              </div>
+              <TreatmentFields
+                product={form.treatment_product_select} onProductChange={v=>{
+                  set("treatment_product_select",v);
+                  if(v!=="Other") set("treatment_product_other","");
+                  if(v==="Apivar") set("treatment_duration","42");
+                  else if(v==="Api-Guard"){ set("treatment_duration","14"); if(!form.treatment_tray) set("treatment_tray","1st Tray"); }
+                }}
+                productOther={form.treatment_product_other} onProductOtherChange={v=>set("treatment_product_other",v)}
+                reason={form.treatment_reason} onReasonChange={v=>set("treatment_reason",v)}
+                date={form.treatment_date||TODAY} onDateChange={v=>set("treatment_date",v)}
+                duration={form.treatment_duration} onDurationChange={v=>set("treatment_duration",v)}
+                tray={form.treatment_tray} onTrayChange={v=>set("treatment_tray",v)}
+                notes={form.treatment_notes} onNotesChange={v=>set("treatment_notes",v)}
+              />
             </div>
           )}
         </Card>
@@ -2128,7 +2183,7 @@ const InspectionView = ({ hive, inspection, onNavigate, onDelete }) => {
           </div>
         </Card>
         {inspection.temperament&&(<Card style={{ marginBottom:12 }}><div style={{ fontWeight:700,color:C.textPrimary,marginBottom:8,fontSize:15 }}>Temperament</div><div style={{ display:"flex",alignItems:"center",gap:10 }}><div style={{ flex:1,display:"flex",gap:4 }}>{[1,2,3,4,5].map(n=><div key={n} style={{ flex:1,height:8,borderRadius:4,background:n<=Number(inspection.temperament)?(Number(inspection.temperament)>=4?C.green:Number(inspection.temperament)<=2?C.red:C.orange):C.border }}/>)}</div><div style={{ fontWeight:700,color:C.textPrimary,minWidth:30,textAlign:"right" }}>{inspection.temperament+"/5"}</div></div><div style={{ fontSize:13,color:C.textMuted,marginTop:4 }}>{TEMP_OPTIONS.find(t=>t.val===inspection.temperament)?.label||""}</div></Card>)}
-        {inspection.has_treatment==="yes"&&(<Card style={{ marginBottom:12 }}><div style={{ display:"flex",justifyContent:"space-between",alignItems:"flex-start" }}><div><div style={{ fontWeight:700,color:C.textPrimary,marginBottom:6,fontSize:15 }}>Treatment</div><div style={{ fontSize:15,color:C.textPrimary }}>{inspection.treatment_product}</div>{inspection.treatment_reason&&<div style={{ fontSize:14,color:C.textMuted,marginTop:2 }}>{inspection.treatment_reason}</div>}</div><BadgeImg src={CROSS_B64} alt="Treatment" name="cross"/></div></Card>)}
+        {inspection.has_treatment==="yes"&&(<Card style={{ marginBottom:12 }}><div style={{ display:"flex",justifyContent:"space-between",alignItems:"flex-start" }}><div><div style={{ fontWeight:700,color:C.textPrimary,marginBottom:6,fontSize:15 }}>Treatment</div><div style={{ fontSize:15,color:C.textPrimary }}>{inspection.treatment_product}{inspection.treatment_tray?" · "+inspection.treatment_tray:""}</div>{inspection.treatment_reason&&<div style={{ fontSize:14,color:C.textMuted,marginTop:2 }}>{inspection.treatment_reason}</div>}{inspection.treatment_notes&&<div style={{ fontSize:14,color:C.textMuted,marginTop:2 }}>{inspection.treatment_notes}</div>}</div><BadgeImg src={CROSS_B64} alt="Treatment" name="cross"/></div></Card>)}
         {inspection.has_action==="yes"&&(inspection.actions||[]).length>0&&(
           <Card style={{ marginBottom:12 }}>
             <div style={{ display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:10 }}>
@@ -2152,14 +2207,66 @@ const InspectionView = ({ hive, inspection, onNavigate, onDelete }) => {
 };
 
 // ── Treatment Form ─────────────────────────────────────────────────────────
+// ── Treatment fields — shared by the standalone Treatment log and the inspection's
+// embedded Treatment section, so product/duration/tray/info behaviour stays consistent
+// wherever a treatment is logged ──────────────────────────────────────────
+const TreatmentFields = ({ product, onProductChange, productOther, onProductOtherChange, reason, onReasonChange, date, onDateChange, duration, onDurationChange, tray, onTrayChange, notes, onNotesChange }) => (
+  <>
+    <Field label="Product">
+      <DDSelect value={product} onChange={onProductChange} options={TREATMENT_PRODUCTS} placeholder="Select product..."/>
+    </Field>
+    {product==="Other"&&(
+      <Field label="Other Product / Info">
+        <Input value={productOther} onChange={onProductOtherChange} placeholder="Enter product name or details"/>
+      </Field>
+    )}
+    {product&&TREATMENT_PRODUCT_INFO[product]&&(
+      <div style={{ fontSize:13,color:C.textSecondary,background:`rgba(${hexToRgb(C.accent)},.06)`,border:`1px solid rgba(${hexToRgb(C.accent)},.2)`,borderRadius:9,padding:"9px 12px",marginBottom:14,lineHeight:1.5 }}>
+        <div style={{ fontWeight:700,color:C.accent,fontSize:12,textTransform:"uppercase",letterSpacing:0.7,marginBottom:3 }}>Treatment Information</div>
+        {TREATMENT_PRODUCT_INFO[product]}
+      </div>
+    )}
+    <Field label="Reason"><Input value={reason} onChange={onReasonChange} placeholder="Varroa, prevention..."/></Field>
+    <div style={{ display:"grid",gridTemplateColumns:"1fr 1fr",gap:10 }}>
+      <Field label="Date"><Input type="date" value={date} onChange={onDateChange}/></Field>
+      <Field label="Duration (days)" style={{ marginBottom:product==="Api-Guard"?14:0 }}><Input type="number" value={duration} onChange={onDurationChange}/></Field>
+    </div>
+    {product==="Api-Guard"&&(
+      <Field label="Which Tray?" style={{ marginBottom:0 }}>
+        <DDSelect value={tray||"1st Tray"} onChange={onTrayChange} options={API_GUARD_TRAYS} placeholder="Select tray..."/>
+        <div style={{ fontSize:13,color:C.textMuted,marginTop:6,lineHeight:1.5 }}>You'll be reminded to add the 2nd tray once the 1st tray's 14 days are up. The 2nd tray marks itself complete automatically once its 14 days are up.</div>
+      </Field>
+    )}
+    <Field label="Notes" style={{ marginBottom:0,marginTop:14 }}>
+      <textarea value={notes} onChange={e=>onNotesChange(e.target.value)} placeholder="Any additional details about this treatment..." style={{...inputBase,minHeight:70,resize:"vertical"}}/>
+    </Field>
+  </>
+);
+
 const TreatmentForm = ({ hive, existing, onSave, onUpdate, onDelete, onNavigate }) => {
-  const [form,setForm]=useState(()=>existing?{product:existing.product||"",reason:existing.reason||"",date:existing.date||TODAY,duration_days:existing.duration_days||"",complete:!!existing.complete}:{product:"",reason:"",date:TODAY,duration_days:"",complete:false});
+  const [form,setForm]=useState(()=>{
+    if(!existing) return {product:"",product_other:"",reason:"",notes:"",date:TODAY,duration_days:"",tray:"",complete:false};
+    const {dropdownValue,otherText}=resolveTreatmentProductUI(existing.product);
+    return {product:dropdownValue,product_other:otherText,reason:existing.reason||"",notes:existing.notes||"",date:existing.date||TODAY,duration_days:existing.duration_days||"",tray:existing.tray||"",complete:!!existing.complete};
+  });
   const [modal,setModal]=useState(null);
   const set=(k,v)=>setForm(f=>({...f,[k]:v}));
+  const onProductChange=v=>{
+    set("product",v);
+    if(v!=="Other") set("product_other","");
+    if(v==="Apivar") set("duration_days","42");
+    else if(v==="Api-Guard"){ set("duration_days","14"); if(!form.tray) set("tray","1st Tray"); }
+  };
   const doSave=()=>{
-    if(!form.product.trim()){alert("Enter product name");return;}
-    if(existing) onUpdate&&onUpdate(hive.id,existing.id,form);
-    else onSave(hive.id,{...form,id:uid(),source:"manual"},"treatment");
+    const resolvedProduct = form.product==="Other" ? (form.product_other||"").trim() : form.product;
+    if(!resolvedProduct){alert("Select or enter a product");return;}
+    const record={
+      product:resolvedProduct, reason:form.reason, notes:form.notes||"", date:form.date, duration_days:form.duration_days,
+      tray: form.product==="Api-Guard" ? (form.tray||"1st Tray") : "",
+      complete:form.complete,
+    };
+    if(existing) onUpdate&&onUpdate(hive.id,existing.id,record);
+    else onSave(hive.id,{...record,id:uid(),source:"manual"},"treatment");
     onNavigate("hive-detail",{hiveId:hive.id});
   };
   const cogItems=existing?[{ label:"Delete", icon:<Icon name="trash" color={C.red} size={16}/>, danger:true, onClick:()=>setModal("delete") }]:null;
@@ -2170,13 +2277,16 @@ const TreatmentForm = ({ hive, existing, onSave, onUpdate, onDelete, onNavigate 
         rightSlot={cogItems?<CogMenu items={cogItems} iconColor={C.textSecondary}/>:null}/>
       <div style={{ padding:16 }}>
         <Card style={{ marginBottom:12 }}>
-          <Field label="Product"><Input value={form.product} onChange={v=>set("product",v)} placeholder="e.g. Apivar, OAV"/></Field>
-          <Field label="Reason"><Input value={form.reason} onChange={v=>set("reason",v)} placeholder="Varroa, prevention..."/></Field>
-          <div style={{ display:"grid",gridTemplateColumns:"1fr 1fr",gap:10 }}>
-            <Field label="Date"><Input type="date" value={form.date} onChange={v=>set("date",v)}/></Field>
-            <Field label="Duration (days)"><Input type="number" value={form.duration_days} onChange={v=>set("duration_days",v)}/></Field>
-          </div>
-          <Toggle value={form.complete} onChange={v=>set("complete",v)} label="Treatment complete"/>
+          <TreatmentFields
+            product={form.product} onProductChange={onProductChange}
+            productOther={form.product_other} onProductOtherChange={v=>set("product_other",v)}
+            reason={form.reason} onReasonChange={v=>set("reason",v)}
+            date={form.date} onDateChange={v=>set("date",v)}
+            duration={form.duration_days} onDurationChange={v=>set("duration_days",v)}
+            tray={form.tray} onTrayChange={v=>set("tray",v)}
+            notes={form.notes} onNotesChange={v=>set("notes",v)}
+          />
+          <div style={{ marginTop:14 }}><Toggle value={form.complete} onChange={v=>set("complete",v)} label="Treatment complete"/></div>
         </Card>
         <Btn onClick={doSave} style={{ width:"100%",justifyContent:"center" }}><Icon name="check" size={17} color="#fff"/> {existing?"Update Treatment":"Save Treatment"}</Btn>
       </div>
@@ -2697,7 +2807,7 @@ const BeekeeperInfo = ({ onBack }) => {
 // ── Data Transfer Page ──────────────────────────────────────────────────────
 // APP_VERSION bumped here whenever the data schema changes — exported files carry it
 const APP_VERSION = 9;
-const APP_DISPLAY_VERSION = "v1.8.1";
+const APP_DISPLAY_VERSION = "v1.9.0";
 
 const DataTransfer = ({ hives, apiaries, activeApiaryId, equipManual, honeyHarvests, onImport, onBack }) => {
   const [importStatus,setImportStatus]=useState("");
@@ -3129,6 +3239,17 @@ export default function App() {
         if(hv.status==="Queenless") return hv;
         return {...hv, queen_since: hv.installed||""};
       });
+      // Api-Guard 2nd tray auto-complete: checked on every load (not a one-time migration)
+      // since it needs to re-evaluate as time passes. Once the 2nd tray's own 14 days have
+      // elapsed, the treatment marks itself complete automatically.
+      migratedHives = migratedHives.map(hv=>({
+        ...hv,
+        treatments: (hv.treatments||[]).map(t=>
+          (t.product==="Api-Guard"&&t.tray==="2nd Tray"&&!t.complete&&t.duration_days&&treatmentDaysLeft(t)===null)
+            ? {...t, complete:true}
+            : t
+        ),
+      }));
       setHives(migratedHives);
       setApiaries(a);
       setActiveApiaryId(aid);
@@ -3365,7 +3486,7 @@ export default function App() {
           }
         }
         if(!exists){
-          if(ins.has_treatment==="yes"&&ins.treatment_product) treatments=[...treatments,{id:uid(),product:ins.treatment_product,reason:ins.treatment_reason||"",date:ins.treatment_date||ins.date,duration_days:ins.treatment_duration||"",complete:false,source:"inspection"}];
+          if(ins.has_treatment==="yes"&&ins.treatment_product) treatments=[...treatments,{id:uid(),product:ins.treatment_product,reason:ins.treatment_reason||"",notes:ins.treatment_notes||"",date:ins.treatment_date||ins.date,duration_days:ins.treatment_duration||"",tray:ins.treatment_product==="Api-Guard"?(ins.treatment_tray||"1st Tray"):"",complete:false,source:"inspection"}];
           // Handle multiple actions
           const actionList = ins.actions||[];
           actionList.forEach(act=>{
@@ -3433,6 +3554,46 @@ export default function App() {
             }
           }
         }
+        // Editing an inspection's actions should keep the hive's box/super counts (and the
+        // queen-excluder auto-rule) in sync with what the edited action list now says —
+        // otherwise e.g. removing a "Removed Super" action from an edit leaves a super
+        // missing from the hive info forever. Scoped deliberately narrow: only counts +
+        // this inspection's own intervention log entries are reconciled here; other action
+        // side-effects (archiving, apiary moves, queen status transitions) remain
+        // create-only, same as ActionForm edits, since re-triggering those on every edit
+        // would risk unsafe double-application.
+        if(exists && !ins.weightOnly){
+          const netCounts = list => {
+            let supers=0, boxes=0;
+            (list||[]).forEach(act=>{
+              const n=Number(act.qty)||1;
+              if(act.type==="Added Super") supers+=n;
+              else if(act.type==="Removed Super") supers-=n;
+              else if(act.type==="Added Brood Box") boxes+=1;
+              else if(act.type==="Removed Brood Box") boxes-=1;
+            });
+            return {supers,boxes};
+          };
+          const oldNet=netCounts(exists.actions), newNet=netCounts(ins.actions);
+          const supersDelta=newNet.supers-oldNet.supers, boxesDelta=newNet.boxes-oldNet.boxes;
+          if(supersDelta!==0){
+            const s=Math.max(0,(Number(hiveUpdate.supers)||0)+supersDelta);
+            hiveUpdate=applyQE({...hiveUpdate,supers:s},s);
+          }
+          if(boxesDelta!==0){
+            hiveUpdate={...hiveUpdate,boxes:Math.max(1,(Number(hiveUpdate.boxes)||1)+boxesDelta)};
+          }
+          // Keep this inspection's own intervention log entries in sync with the edited actions
+          const oldActionIds=new Set((exists.actions||[]).map(a=>a.id).filter(Boolean));
+          const newActionIds=new Set((ins.actions||[]).filter(a=>a.type).map(a=>a.id).filter(Boolean));
+          interventions=interventions.filter(iv=>!(oldActionIds.has(iv.id)&&!newActionIds.has(iv.id)));
+          (ins.actions||[]).forEach(act=>{
+            if(!act.type) return;
+            const record={id:act.id||uid(),type:act.type,qty:act.qty||"1",details:act.details||"",swarm_status:act.swarm_status||"",old_queen_location:act.old_queen_location||"",old_queen_target_hive_id:act.old_queen_target_hive_id||"",old_queen_target_hive_name:act.old_queen_target_hive_name||"",old_queen_hive_number:act.old_queen_hive_number||"",date:ins.date,source:"inspection"};
+            const idx=interventions.findIndex(iv=>iv.id===record.id);
+            if(idx!==-1) interventions[idx]=record; else interventions=[...interventions,record];
+          });
+        }
         const newInspections=exists?h.inspections.map(i=>i.id===ins.id?ins:i):[...h.inspections,ins];
         return {...hiveUpdate,inspections:newInspections,treatments,interventions};
       });
@@ -3487,6 +3648,14 @@ export default function App() {
   const markTreatmentComplete=(hiveId,treatId)=>{
     setHives(hs=>hs.map(h=>h.id!==hiveId?h:{
       ...h,treatments:h.treatments.map(t=>t.id===treatId?{...t,complete:true}:t)
+    }));
+  };
+  // Api-Guard 1st tray's 14 days are up — swap in the 2nd tray, restarting the
+  // 14-day clock from today. The 2nd tray then auto-completes on its own once its
+  // 14 days elapse (see the app-load Api-Guard reconciliation pass).
+  const addSecondApiGuardTray=(hiveId,treatId)=>{
+    setHives(hs=>hs.map(h=>h.id!==hiveId?h:{
+      ...h,treatments:h.treatments.map(t=>t.id===treatId?{...t,tray:"2nd Tray",date:TODAY,duration_days:"14"}:t)
     }));
   };
   const moveHive=(hiveId,form)=>{
@@ -3555,8 +3724,8 @@ export default function App() {
   else if(screen==="add-hive")        content=<HiveForm apiaryId={currentApiaryId} allHives={hives} onSave={saveHive} onNavigate={navigate}/>;
   else if(screen==="edit-hive")       { const h=getHive(params.hiveId); if(h) content=<HiveForm existing={h} apiaryId={currentApiaryId} allHives={hives} onSave={saveHive} onNavigate={navigate}/>; }
   else if(screen==="hive-detail")     { const h=getHive(params.hiveId); if(h) content=<HiveDetail hive={h} onNavigate={navigate} onDelete={deleteHive} onArchive={archiveHive} onRestore={restoreHive} onToggleTreatment={toggleTreatmentComplete} onToggleFeeder={toggleFeederActive} onDeleteTreatment={deleteTreatment} onDeleteIntervention={deleteIntervention}/>; }
-  else if(screen==="add-inspection")  { const h=getHive(params.hiveId); if(h) content=<InspectionForm hive={h} onSave={saveInspection} onNavigate={navigate} onMarkTreatmentComplete={markTreatmentComplete} apiaries={apiaries} hives={hives}/>; }
-  else if(screen==="edit-inspection") { const h=getHive(params.hiveId); const ins=h&&h.inspections.find(i=>i.id===params.inspectionId); if(h&&ins) content=<InspectionForm hive={h} existing={ins} onSave={saveInspection} onNavigate={navigate} onMarkTreatmentComplete={markTreatmentComplete} apiaries={apiaries} hives={hives}/>; }
+  else if(screen==="add-inspection")  { const h=getHive(params.hiveId); if(h) content=<InspectionForm hive={h} onSave={saveInspection} onNavigate={navigate} onMarkTreatmentComplete={markTreatmentComplete} onAddSecondTray={addSecondApiGuardTray} apiaries={apiaries} hives={hives}/>; }
+  else if(screen==="edit-inspection") { const h=getHive(params.hiveId); const ins=h&&h.inspections.find(i=>i.id===params.inspectionId); if(h&&ins) content=<InspectionForm hive={h} existing={ins} onSave={saveInspection} onNavigate={navigate} onMarkTreatmentComplete={markTreatmentComplete} onAddSecondTray={addSecondApiGuardTray} apiaries={apiaries} hives={hives}/>; }
   else if(screen==="log-weight")       { const h=getHive(params.hiveId); if(h) content=<WeightLog hive={h} onSave={saveInspection} onNavigate={navigate}/>; }
   else if(screen==="edit-weight")     { const h=getHive(params.hiveId); const ins=h&&h.inspections.find(i=>i.id===params.inspectionId); if(h&&ins) content=<WeightLog hive={h} existing={ins} onSave={saveInspection} onNavigate={navigate}/>; }
   else if(screen==="view-inspection") { const h=getHive(params.hiveId); const ins=h&&h.inspections.find(i=>i.id===params.inspectionId); if(h&&ins) content=<InspectionView hive={h} inspection={ins} onNavigate={navigate} onDelete={deleteInspection}/>; }
