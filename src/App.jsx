@@ -88,6 +88,12 @@ const KG_PER_LB = 0.45359237;
 const kgToLb = kg => kg/KG_PER_LB;
 const lbToKg = lb => lb*KG_PER_LB;
 
+// Show / Competition records — honey show classes commonly judged at UK BKA shows
+const SHOW_CLASSES = ["Light Honey","Medium Honey","Dark Honey","Set Honey","Liquid Honey","Cut Comb","Wax Blocks","Wax Candles","Honey Cake","Honey Shortbread","Honey Fudge","Mead"];
+const SHOW_PLACINGS = ["1st","2nd","3rd","Did Not Place"];
+// Gold / silver / bronze — used for both the rosette icon and the record's colour bar
+const SHOW_PLACING_COLORS = { "1st":"#C9A227", "2nd":"#9AA0A6", "3rd":"#B0703A", "Did Not Place":C.textMuted };
+
 const HIVE_TYPES    = ["National","Deep National","Commercial","Langstroth","Mating Nuc (Apidea)"];
 const HIVE_STATUSES = ["Queenless","Requeening","Archived"];
 const STATUS_COLORS = { Queenless:C.statusQueenless, Requeening:C.statusRequeening, Archived:C.statusArchived };
@@ -106,6 +112,7 @@ const INSPECTION_DEFAULTS = {
   has_action:"",actions:[],
   has_treatment:"",treatment_product:"",treatment_product_other:"",treatment_reason:"",treatment_notes:"",treatment_tray:"",treatment_date:"",treatment_duration:"",
   do_not_inspect:false,do_not_inspect_weeks:"1",do_not_inspect_reason:"",
+  priority_inspection:false,priority_inspection_reason:"",
   notes:"",weight_kg:"",
 };
 const DO_NOT_INSPECT_WEEK_OPTIONS = ["1","2","3","4"];
@@ -124,6 +131,10 @@ const hasActiveSkip = (hive) => {
   const until=new Date(hive.skip_inspection_until);
   return until>=today;
 };
+// Winter inspection pause auto-off window — April (month 3) through September (month 8).
+// If the pause is still on when the app loads during this window, it's a leftover from
+// last winter and gets switched off automatically; leaving it on through Oct–Mar is fine.
+const isWinterPauseAutoOffWindow = () => { const m=new Date().getMonth(); return m>=3&&m<=8; };
 // Check if a hive has an active feed action (no matching "Remove Feeder" after it)
 const hasActiveFeeder = (hive) => {
   const ivs = (hive.interventions||[]).slice().sort((a,b)=>new Date(a.date)-new Date(b.date));
@@ -303,9 +314,11 @@ const Icon = ({ name, size=22, color="currentColor", style={} }) => {
     shed:    `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="${c}" stroke-width="2"><rect x="2" y="7" width="20" height="15" rx="1"/><path d="M1 7l11-5 11 5"/><line x1="9" y1="22" x2="9" y2="14"/><line x1="15" y1="22" x2="15" y2="14"/><rect x="9" y="14" width="6" height="8"/></svg>`,
     location:`<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="${c}" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>`,
     honeypot:`<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="${c}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7.5 8.5h9l-1.1 11a2 2 0 0 1-2 1.8h-2.8a2 2 0 0 1-2-1.8l-1.1-11z"/><path d="M6.5 5.5h11"/><rect x="9" y="3" width="6" height="2.3" rx="0.6"/><path d="M8.3 12h7.4"/><path d="M8.7 15.3h6.6"/></svg>`,
+    honeyjar:`<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="${c}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="8.5" width="12" height="12.5" rx="2"/><rect x="7.5" y="4.5" width="9" height="3.7" rx="1"/><line x1="6" y1="13.2" x2="18" y2="13.2"/><path d="M9 16.6c.7-1 1.6-1 2.2 0s1.3 1 2 0 1.3-1 2 0"/></svg>`,
     kofi:    `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none"><path d="M4 7h13a2 2 0 0 1 2 2v6a5 5 0 0 1-5 5H9a5 5 0 0 1-5-5V7z" fill="${c}"/><path d="M19 9h1.5a2.5 2.5 0 0 1 0 5H19" stroke="${c}" stroke-width="1.8" fill="none" stroke-linecap="round"/><path d="M8.2 10.3c.9-1.1 2.7-.7 2.8.7.1-1.4 1.9-1.8 2.8-.7.9 1.1.1 2.5-1 3.5l-1.8 1.6-1.8-1.6c-1.1-1-1.9-2.4-1-3.5z" fill="#FF5E5B"/></svg>`,
     download:`<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="${c}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>`,
     scale:   `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="${c}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="4" width="19" height="16" rx="3"/><circle cx="12" cy="12" r="4.2"/><line x1="12" y1="9.2" x2="12" y2="12" stroke-width="1.6"/><line x1="6" y1="7" x2="7.3" y2="7.9" stroke-width="1.6"/><line x1="18" y1="7" x2="16.7" y2="7.9" stroke-width="1.6"/></svg>`,
+    rosette: `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="${c}" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M8.5 13.8L6.2 22l5.8-3.4 5.8 3.4-2.3-8.2" fill="${c}" fill-opacity="0.15"/><circle cx="12" cy="8" r="6.2" fill="${c}" fill-opacity="0.18"/><circle cx="12" cy="8" r="2.4" fill="${c}" stroke="none"/></svg>`,
   };
   return <span style={{ display:"inline-flex",alignItems:"center",...style }} dangerouslySetInnerHTML={{ __html:icons[name]||icons.hive }}/>;
 };
@@ -1038,7 +1051,7 @@ const alphaNumSort=(a,b)=>{
   return 0;
 };
 
-const HiveList = ({ hives, apiaries, activeApiaryId, onSelectApiary, onNavigate, customOrder, onReorder }) => {
+const HiveList = ({ hives, apiaries, activeApiaryId, onSelectApiary, onNavigate, customOrder, onReorder, winterPause }) => {
   const [filter,setFilter]=useState("All Active");
   const [reordering,setReordering]=useState(false);
   const [dragList,setDragList]=useState([]);
@@ -1066,7 +1079,9 @@ const HiveList = ({ hives, apiaries, activeApiaryId, onSelectApiary, onNavigate,
     return alphaNumSort(a.name,b.name);
   });
 
-  const needsInspection=rawHives.filter(h=>h.status!=="Archived"&&!hasActiveSkip(h)&&(!h.inspections.length||(Date.now()-new Date(Math.max(...h.inspections.map(i=>new Date(i.date)))))/86400000>14));
+  // Winter pause (set in Options) suppresses "Inspection Overdue" entirely — inspections
+  // can still be logged as normal, they just won't be flagged as overdue while paused.
+  const needsInspection=winterPause?[]:rawHives.filter(h=>h.status!=="Archived"&&!hasActiveSkip(h)&&(!h.inspections.length||(Date.now()-new Date(Math.max(...h.inspections.map(i=>new Date(i.date)))))/86400000>14));
 
   const cogMenuItems = [
     { label:"Add Hive", icon:<Icon name="plus" color={accent} size={16}/>, onClick:()=>onNavigate("add-hive") },
@@ -1202,8 +1217,9 @@ const HiveList = ({ hives, apiaries, activeApiaryId, onSelectApiary, onNavigate,
                       {minDays!==null&&<span style={{ fontSize:13,fontWeight:600,color:C.orange,background:`rgba(${hexToRgb(C.orange)},.1)`,borderRadius:6,padding:"2px 8px" }}>{"Treatment: "+minDays+"d left"}</span>}
                       {hasOverdueTreat&&minDays===null&&<span style={{ fontSize:13,fontWeight:600,color:C.red,background:`rgba(${hexToRgb(C.red)},.08)`,borderRadius:6,padding:"2px 8px" }}>Treatment overdue</span>}
                       {needsSecondTray&&<span style={{ fontSize:13,fontWeight:600,color:C.honey,background:`rgba(${hexToRgb(C.honey)},.14)`,borderRadius:6,padding:"2px 8px" }}>Add 2nd Api-Guard tray</span>}
-                      {isFeeding&&!hive.isNuc&&<span style={{ fontSize:13,fontWeight:600,color:C.blue,background:`rgba(${hexToRgb(C.blue)},.1)`,borderRadius:6,padding:"2px 8px" }}>Feeding</span>}
+                      {isFeeding&&<span style={{ fontSize:13,fontWeight:600,color:C.blue,background:`rgba(${hexToRgb(C.blue)},.1)`,borderRadius:6,padding:"2px 8px" }}>Feeding</span>}
                       {skipActive&&<span style={{ fontSize:13,fontWeight:600,color:C.textSecondary,background:`rgba(${hexToRgb(C.textMuted)},.15)`,borderRadius:6,padding:"2px 8px" }}>{"Do not inspect until "+fmtDate(hive.skip_inspection_until)}</span>}
+                      {hive.priority_inspection&&<span title={hive.priority_inspection_reason||""} style={{ fontSize:13,fontWeight:600,color:C.red,background:`rgba(${hexToRgb(C.red)},.1)`,borderRadius:6,padding:"2px 8px" }}>⚑ Priority Inspection</span>}
                     </div>
                     );
                   })()}
@@ -1281,6 +1297,7 @@ const HiveDetail = ({ hive, onNavigate, onDelete, onArchive, onRestore, onToggle
           <div>
             {isArchived&&(<div style={{ background:`rgba(${hexToRgb(C.textMuted)},.1)`,border:`1.5px solid rgba(${hexToRgb(C.textMuted)},.3)`,borderRadius:12,padding:"12px 16px",marginBottom:14,display:"flex",alignItems:"center",gap:10 }}><Icon name="archive" color={C.textMuted} size={18}/><div><div style={{ fontWeight:600,color:C.textSecondary,fontSize:15 }}>Archived hive position</div><div style={{ fontSize:13,color:C.textMuted }}>Use the ⚙ menu to restore.</div></div></div>)}
             {!isArchived&&hasActiveSkip(hive)&&(<div style={{ background:`rgba(${hexToRgb(C.textMuted)},.12)`,border:`1.5px solid rgba(${hexToRgb(C.textMuted)},.3)`,borderRadius:12,padding:"12px 16px",marginBottom:14,display:"flex",alignItems:"center",gap:10 }}><Icon name="warn" color={C.textSecondary} size={18}/><div><div style={{ fontWeight:600,color:C.textSecondary,fontSize:15 }}>{"Do not inspect until "+fmtDate(hive.skip_inspection_until)}</div>{hive.skip_inspection_reason&&<div style={{ fontSize:13,color:C.textMuted }}>{hive.skip_inspection_reason}</div>}</div></div>)}
+            {!isArchived&&hive.priority_inspection&&(<div style={{ background:`rgba(${hexToRgb(C.red)},.08)`,border:`1.5px solid rgba(${hexToRgb(C.red)},.3)`,borderRadius:12,padding:"12px 16px",marginBottom:14,display:"flex",alignItems:"center",gap:10 }}><Icon name="warn" color={C.red} size={18}/><div><div style={{ fontWeight:600,color:C.red,fontSize:15 }}>Flagged for priority inspection next week</div>{hive.priority_inspection_reason&&<div style={{ fontSize:13,color:C.textMuted }}>{hive.priority_inspection_reason}</div>}</div></div>)}
             <InspectionSummaryBar ins={lastIns}/>
             {!lastIns&&<Card style={{ marginBottom:14,background:"#FFF8E1",border:`1.5px solid rgba(${hexToRgb(C.orange)},.3)` }}><div style={{ fontSize:15,color:C.orange,fontWeight:600 }}>No inspections yet</div><div style={{ fontSize:14,color:C.textMuted,marginTop:2 }}>Tap Inspect to start tracking.</div></Card>}
             <Card style={{ marginBottom:14,background:C.surfaceAlt }}>
@@ -1865,6 +1882,10 @@ const InspectionForm = ({ hive, existing, onSave, onNavigate, onMarkTreatmentCom
     return {...base, treatment_product_select:dropdownValue, treatment_product_other:base.treatment_product_other||otherText};
   });
   const set=(k,v)=>setForm(f=>({...f,[k]:v}));
+  // Api-Guard "Add 2nd Tray" — optional medicine-info notes entered at that point are
+  // appended to the treatment's existing notes (see onAddSecondTray/addSecondApiGuardTray).
+  const [secondTrayNotesFor,setSecondTrayNotesFor]=useState(null);
+  const [secondTrayNotesText,setSecondTrayNotesText]=useState("");
   const seenItems=[
     {key:"queen_seen",label:"Queen",invert:false},{key:"eggs_seen",label:"Eggs",invert:false},
     {key:"larvae_seen",label:"Larvae",invert:false},{key:"capped_brood_seen",label:"Capped Brood",invert:false},
@@ -2003,7 +2024,7 @@ const InspectionForm = ({ hive, existing, onSave, onNavigate, onMarkTreatmentCom
             <div key={act.id} style={{ background:C.bg,borderRadius:10,padding:12,marginTop:8,position:"relative" }}>
               {form.actions.length>1&&<button onClick={()=>set("actions",form.actions.filter((_,i)=>i!==ai))} style={{ position:"absolute",top:8,right:8,background:"none",border:"none",cursor:"pointer",color:C.red,fontSize:20,lineHeight:1 }}>×</button>}
               <Field label={"Action "+(form.actions.length>1?ai+1+"":"")}>
-                <DDSelect value={act.type} onChange={v=>{ const a=[...form.actions]; a[ai]={...a[ai],type:v,qty:"1",swarm_status:"",old_queen_location:"",old_queen_target_hive_id:"",old_queen_target_hive_name:"",old_queen_hive_number:"",new_hive_name:"",new_hive_apiary_id:""}; set("actions",a); }} options={ACTION_TYPES} placeholder="Select type..."/>
+                <DDSelect value={act.type} onChange={v=>{ const a=[...form.actions]; a[ai]={...a[ai],type:v,qty:"1",swarm_status:"",old_queen_location:"",old_queen_target_hive_id:"",old_queen_target_hive_name:"",old_queen_hive_number:"",new_hive_name:"",new_hive_apiary_id:"",combine_target_id:"",eggs_transfer_hive_id:"",eggs_transfer_external:false,eggs_source_hive_id:"",eggs_source_external:false}; set("actions",a); }} options={ACTION_TYPES} placeholder="Select type..."/>
               </Field>
               {SUPER_CHANGE_ACTIONS.includes(act.type)&&(
                 <Field label="How many supers?">
@@ -2029,6 +2050,31 @@ const InspectionForm = ({ hive, existing, onSave, onNavigate, onMarkTreatmentCom
               {act.type==="Sold/Given Away"&&(
                 <SoldGivenAwayFields act={act} ai={ai} actions={form.actions} setActions={v=>set("actions",v)}/>
               )}
+              {act.type==="Combine Hive"&&(
+                <CombineHiveFields act={act} ai={ai} actions={form.actions} setActions={v=>set("actions",v)} hives={hives} currentHiveId={hive.id}/>
+              )}
+              {act.type==="Frame of Eggs Removed"&&(
+                <div style={{ marginBottom:10 }}>
+                  <Field label="Transferred to">
+                    <DDSelect value={act.eggs_transfer_hive_id||""} onChange={v=>{ const a=[...form.actions]; a[ai]={...a[ai],eggs_transfer_hive_id:v==="__external__"?"":v,eggs_transfer_external:v==="__external__"}; set("actions",a); }}
+                      options={[{label:"Outside Apiary",val:"__external__"},...hives.filter(h=>h.id!==hive.id&&h.status!=="Archived").map(h=>({label:h.name,val:h.id}))]}
+                      placeholder="Select destination..."/>
+                  </Field>
+                  {act.eggs_transfer_external&&<div style={{ fontSize:13,color:C.textMuted,marginBottom:6,padding:"6px 10px",background:"rgba(0,0,0,.04)",borderRadius:8 }}>Frame transferred to a hive outside this apiary — only this hive will be logged.</div>}
+                  {act.eggs_transfer_hive_id&&hives.find(h=>h.id===act.eggs_transfer_hive_id)&&<div style={{ fontSize:13,color:C.accent,marginBottom:6,padding:"6px 10px",background:`rgba(59,158,232,.07)`,borderRadius:8 }}>A "Frame of Eggs Added" action will also be logged in {hives.find(h=>h.id===act.eggs_transfer_hive_id).name}.</div>}
+                </div>
+              )}
+              {act.type==="Frame of Eggs Added"&&(
+                <div style={{ marginBottom:10 }}>
+                  <Field label="Received from">
+                    <DDSelect value={act.eggs_source_hive_id||""} onChange={v=>{ const a=[...form.actions]; a[ai]={...a[ai],eggs_source_hive_id:v==="__external__"?"":v,eggs_source_external:v==="__external__"}; set("actions",a); }}
+                      options={[{label:"Outside Apiary",val:"__external__"},...hives.filter(h=>h.id!==hive.id&&h.status!=="Archived").map(h=>({label:h.name,val:h.id}))]}
+                      placeholder="Select source..."/>
+                  </Field>
+                  {act.eggs_source_external&&<div style={{ fontSize:13,color:C.textMuted,marginBottom:6,padding:"6px 10px",background:"rgba(0,0,0,.04)",borderRadius:8 }}>Frame received from a hive outside this apiary — only this hive will be logged.</div>}
+                  {act.eggs_source_hive_id&&hives.find(h=>h.id===act.eggs_source_hive_id)&&<div style={{ fontSize:13,color:C.accent,marginBottom:6,padding:"6px 10px",background:`rgba(59,158,232,.07)`,borderRadius:8 }}>A "Frame of Eggs Removed" action will also be logged in {hives.find(h=>h.id===act.eggs_source_hive_id).name}.</div>}
+                </div>
+              )}
               <Field label="Details" style={{ marginBottom:0 }}>
                 <textarea value={act.details} onChange={e=>{ const a=[...form.actions]; a[ai]={...a[ai],details:e.target.value}; set("actions",a); }} placeholder="Describe the action..." style={{...inputBase,minHeight:60,resize:"vertical"}}/>
               </Field>
@@ -2041,8 +2087,8 @@ const InspectionForm = ({ hive, existing, onSave, onNavigate, onMarkTreatmentCom
             </button>
           )}
         </Card>
-        {/* Feeder toggle — only for non-nuc hives with active feed */}
-        {!hive.isNuc&&hasActiveFeeder(hive)&&(()=>{
+        {/* Feeder toggle — for any hive (incl. Nucs) with an active feed */}
+        {hasActiveFeeder(hive)&&(()=>{
           const feederRemoved=!!(form.actions||[]).find(a=>a.type==="Remove Feeder");
           return (
             <Card style={{ marginBottom:12,background:feederRemoved?`rgba(${hexToRgb(C.green)},.04)`:`rgba(${hexToRgb(C.blue)},.04)`,border:`1.5px solid ${feederRemoved?C.green:`rgba(${hexToRgb(C.blue)},.2)`}` }}>
@@ -2072,22 +2118,41 @@ const InspectionForm = ({ hive, existing, onSave, onNavigate, onMarkTreatmentCom
             <SectionHead label="Active Treatment"/>
             {(hive.treatments||[]).filter(t=>!t.complete&&(treatmentDaysLeft(t)!==null||t.duration_days)).map(t=>{
               const awaitingSecondTray=apiGuardAwaitingSecondTray(t);
+              const enteringSecondTrayNotes=secondTrayNotesFor===t.id;
               return (
-              <div key={t.id} style={{ display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8 }}>
-                <div>
-                  <div style={{ fontWeight:600,color:C.textPrimary,fontSize:15 }}>{t.product}{t.tray?" · "+t.tray:""}</div>
-                  <div style={{ fontSize:13,color:C.textMuted }}>{awaitingSecondTray?"1st tray done — add the 2nd tray":"Started "+fmtDate(t.date)}</div>
+              <div key={t.id} style={{ marginBottom:8 }}>
+                <div style={{ display:"flex",justifyContent:"space-between",alignItems:"center" }}>
+                  <div>
+                    <div style={{ fontWeight:600,color:C.textPrimary,fontSize:15 }}>{t.product}{t.tray?" · "+t.tray:""}</div>
+                    <div style={{ fontSize:13,color:C.textMuted }}>{awaitingSecondTray?"1st tray done — add the 2nd tray":"Started "+fmtDate(t.date)}</div>
+                  </div>
+                  {awaitingSecondTray?(
+                    enteringSecondTrayNotes?(
+                      <button onClick={()=>{ onAddSecondTray(hive.id,t.id,secondTrayNotesText); setSecondTrayNotesFor(null); setSecondTrayNotesText(""); }}
+                        style={{ background:`rgba(${hexToRgb(C.honey)},.14)`,border:`1px solid ${C.honey}`,borderRadius:8,padding:"6px 12px",color:C.honey,fontFamily:"'Roboto',sans-serif",fontWeight:600,fontSize:14,cursor:"pointer" }}>
+                        Confirm
+                      </button>
+                    ):(
+                      <button onClick={()=>{ setSecondTrayNotesFor(t.id); setSecondTrayNotesText(""); }}
+                        style={{ background:`rgba(${hexToRgb(C.honey)},.14)`,border:`1px solid ${C.honey}`,borderRadius:8,padding:"6px 12px",color:C.honey,fontFamily:"'Roboto',sans-serif",fontWeight:600,fontSize:14,cursor:"pointer" }}>
+                        Add 2nd Tray
+                      </button>
+                    )
+                  ):(
+                    <button onClick={()=>onMarkTreatmentComplete(hive.id,t.id)}
+                      style={{ background:`rgba(${hexToRgb(C.green)},.1)`,border:`1px solid ${C.green}`,borderRadius:8,padding:"6px 12px",color:C.green,fontFamily:"'Roboto',sans-serif",fontWeight:600,fontSize:14,cursor:"pointer" }}>
+                      Mark Complete
+                    </button>
+                  )}
                 </div>
-                {awaitingSecondTray?(
-                  <button onClick={()=>onAddSecondTray(hive.id,t.id)}
-                    style={{ background:`rgba(${hexToRgb(C.honey)},.14)`,border:`1px solid ${C.honey}`,borderRadius:8,padding:"6px 12px",color:C.honey,fontFamily:"'Roboto',sans-serif",fontWeight:600,fontSize:14,cursor:"pointer" }}>
-                    Add 2nd Tray
-                  </button>
-                ):(
-                  <button onClick={()=>onMarkTreatmentComplete(hive.id,t.id)}
-                    style={{ background:`rgba(${hexToRgb(C.green)},.1)`,border:`1px solid ${C.green}`,borderRadius:8,padding:"6px 12px",color:C.green,fontFamily:"'Roboto',sans-serif",fontWeight:600,fontSize:14,cursor:"pointer" }}>
-                    Mark Complete
-                  </button>
+                {enteringSecondTrayNotes&&(
+                  <div style={{ marginTop:8 }}>
+                    <Field label="Medicine info (optional)" style={{ marginBottom:0 }}>
+                      <textarea value={secondTrayNotesText} onChange={e=>setSecondTrayNotesText(e.target.value)} placeholder="e.g. Batch number, dose — added to the treatment notes"
+                        style={{...inputBase,minHeight:60,resize:"vertical"}}/>
+                    </Field>
+                    <div style={{ fontSize:12,color:C.textMuted,marginTop:4 }}>Added to the existing treatment notes — nothing already recorded is replaced.</div>
+                  </div>
                 )}
               </div>
               );
@@ -2132,6 +2197,16 @@ const InspectionForm = ({ hive, existing, onSave, onNavigate, onMarkTreatmentCom
               </Field>
               <Field label="Reason" style={{ marginBottom:0 }}>
                 <Input value={form.do_not_inspect_reason||""} onChange={v=>set("do_not_inspect_reason",v)} placeholder="e.g. Cold snap, leave them be"/>
+              </Field>
+            </div>
+          )}
+          <Field label="Priority inspection next week" style={{ marginTop:14,marginBottom:form.priority_inspection?14:0 }}>
+            <Toggle value={!!form.priority_inspection} onChange={v=>set("priority_inspection",v)} label="Flag this hive for a priority inspection next week"/>
+          </Field>
+          {form.priority_inspection&&(
+            <div style={{ background:`rgba(${hexToRgb(C.orange)},.08)`,borderRadius:10,padding:12 }}>
+              <Field label="Reason" style={{ marginBottom:0 }}>
+                <Input value={form.priority_inspection_reason||""} onChange={v=>set("priority_inspection_reason",v)} placeholder="e.g. Queen cells seen, check again soon"/>
               </Field>
             </div>
           )}
@@ -2377,7 +2452,7 @@ const ActionForm = ({ hive, existing, onSave, onUpdate, onDelete, onNavigate, ap
             <div style={{ marginBottom:10 }}>
               <Field label="Transferred to">
                 <DDSelect value={form.eggs_transfer_hive_id||""} onChange={v=>{ set("eggs_transfer_hive_id",v==="__external__"?"":v); set("eggs_transfer_external",v==="__external__"); }}
-                  options={[{label:"Outside Apiary",value:"__external__"},...hives.filter(h=>h.id!==hive.id&&h.status!=="Archived").map(h=>({label:h.name,value:h.id}))]}
+                  options={[{label:"Outside Apiary",val:"__external__"},...hives.filter(h=>h.id!==hive.id&&h.status!=="Archived").map(h=>({label:h.name,val:h.id}))]}
                   placeholder="Select destination..."/>
               </Field>
               {form.eggs_transfer_external&&<div style={{ fontSize:13,color:C.textMuted,marginBottom:6,padding:"6px 10px",background:"rgba(0,0,0,.04)",borderRadius:8 }}>Frame transferred to a hive outside this apiary — only this hive will be logged.</div>}
@@ -2388,7 +2463,7 @@ const ActionForm = ({ hive, existing, onSave, onUpdate, onDelete, onNavigate, ap
             <div style={{ marginBottom:10 }}>
               <Field label="Received from">
                 <DDSelect value={form.eggs_source_hive_id||""} onChange={v=>{ set("eggs_source_hive_id",v==="__external__"?"":v); set("eggs_source_external",v==="__external__"); }}
-                  options={[{label:"Outside Apiary",value:"__external__"},...hives.filter(h=>h.id!==hive.id&&h.status!=="Archived").map(h=>({label:h.name,value:h.id}))]}
+                  options={[{label:"Outside Apiary",val:"__external__"},...hives.filter(h=>h.id!==hive.id&&h.status!=="Archived").map(h=>({label:h.name,val:h.id}))]}
                   placeholder="Select source..."/>
               </Field>
               {form.eggs_source_external&&<div style={{ fontSize:13,color:C.textMuted,marginBottom:6,padding:"6px 10px",background:"rgba(0,0,0,.04)",borderRadius:8 }}>Frame received from a hive outside this apiary — only this hive will be logged.</div>}
@@ -2431,8 +2506,10 @@ const EquipmentShed = ({ hives, onBack, manualCounts, onSetManual }) => {
   // Queen excluders: only where explicitly true (null/undefined means none fitted).
   const queenExcludersInUse = nonNucHives.filter(h=>h.queen_excluder===true).length;
   const nucsInUse       = nucHives.length;
-  // Feeders: nucs can have feeders too (mating nucs excluded — see note above).
-  const feedersInUse    = activeHives.filter(h=>!isMatingNuc(h)&&hasActiveFeeder(h)).length;
+  // Feeders: Nucs have their own integrated feeder (not drawn from the shed), so only
+  // non-nuc hives with an active feed count here — applies to historic Feed actions too,
+  // since this is computed live from each hive's current feeder state, not stored.
+  const feedersInUse    = nonNucHives.filter(hasActiveFeeder).length;
   // Roofs, floors, crown boards: one per standard hive only (nucs have their own lids).
   const roofsInUse      = nonNucHives.length;
   const floorsInUse     = nonNucHives.length;
@@ -2616,14 +2693,14 @@ const BeekeeperInfo = ({ onBack }) => {
     {flower:"Snowdrop",           months:"Jan–Mar", color:"#F0EEE8", notes:"Near white, very pale cream"},
     {flower:"Hazel",              months:"Jan–Mar", color:"#D4C068", notes:"Bright mid yellow"},
     {flower:"Alder",              months:"Feb–Mar", color:"#C8A830", notes:"Deep yellow-gold"},
-    {flower:"Willow (Pussy)",     months:"Feb–Apr", color:"#F0C830", notes:"Rich bright yellow"},
+    {flower:"Pussy Willow",       months:"Feb–Apr", color:"#F0C830", notes:"Rich bright yellow"},
     {flower:"Blackthorn / Sloe",  months:"Mar–Apr", color:"#EEE0A0", notes:"Pale cream-yellow"},
     {flower:"Dandelion",          months:"Mar–Oct", color:"#FFB300", notes:"Deep golden yellow"},
     {flower:"Sycamore",           months:"Apr–May", color:"#D4D068", notes:"Mid yellow, slightly greenish"},
-    {flower:"Oil Seed Rape",      months:"Apr–Jun", color:"#FFE135", notes:"Pale bright yellow, very abundant"},
-    {flower:"Cherry / Prunus",    months:"Mar–Apr", color:"#F5DEB3", notes:"Warm pale cream"},
+    {flower:"Oilseed Rape",       months:"Apr–Jun", color:"#FFE135", notes:"Pale bright yellow, very abundant"},
+    {flower:"Wild Cherry",        months:"Mar–Apr", color:"#F5DEB3", notes:"Warm pale cream"},
     {flower:"Gooseberry",         months:"Mar–Apr", color:"#E8D890", notes:"Yellow-cream"},
-    {flower:"Celandine (Lesser)", months:"Mar–May", color:"#FFC820", notes:"Bright orange-yellow"},
+    {flower:"Lesser Celandine",   months:"Mar–May", color:"#FFC820", notes:"Bright orange-yellow"},
     // Spring
     {flower:"Apple",              months:"Apr–May", color:"#F4E1C0", notes:"Cream to pale yellow"},
     {flower:"Pear",               months:"Apr–May", color:"#EEE0B0", notes:"Cream, slightly darker than apple"},
@@ -2635,16 +2712,16 @@ const BeekeeperInfo = ({ onBack }) => {
     {flower:"Cowslip",            months:"Apr–May", color:"#F0C840", notes:"Deep yellow"},
     {flower:"Garlic Mustard",     months:"Apr–Jun", color:"#F5F0C8", notes:"Pale cream-white"},
     {flower:"Sallow / Goat Willow",months:"Mar–Apr",color:"#F0C020", notes:"Rich yellow"},
-    {flower:"Lime / Linden",      months:"Jul",     color:"#D4E890", notes:"Pale yellow-green"},
+    {flower:"Lime",               months:"Jul",     color:"#D4E890", notes:"Pale yellow-green"},
     // Early summer
-    {flower:"Clover (White)",     months:"Jun–Sep", color:"#F5F0DC", notes:"Near white, cream"},
-    {flower:"Clover (Red)",       months:"Jun–Sep", color:"#F0B0B8", notes:"Pale pink"},
-    {flower:"Clover (Alsike)",    months:"Jun–Aug", color:"#E8C0C8", notes:"Pale pink-cream"},
+    {flower:"White Clover",       months:"Jun–Sep", color:"#F5F0DC", notes:"Near white, cream"},
+    {flower:"Red Clover",         months:"Jun–Sep", color:"#F0B0B8", notes:"Pale pink"},
+    {flower:"Alsike Clover",      months:"Jun–Aug", color:"#E8C0C8", notes:"Pale pink-cream"},
     {flower:"Phacelia",           months:"May–Sep", color:"#C0A8E0", notes:"Pale grey-violet"},
     {flower:"Borage",             months:"Jun–Oct", color:"#90B8E0", notes:"Grey-blue"},
     {flower:"Cornflower",         months:"Jun–Aug", color:"#5888C0", notes:"Greyish blue"},
     {flower:"Viper's Bugloss",    months:"Jun–Aug", color:"#7898D0", notes:"Blue-grey"},
-    {flower:"Poppy (Field)",      months:"Jun–Aug", color:"#303040", notes:"Very dark blue-black"},
+    {flower:"Field Poppy",        months:"Jun–Aug", color:"#303040", notes:"Very dark blue-black"},
     {flower:"Foxglove",           months:"Jun–Aug", color:"#B8A8C8", notes:"Pale grey-purple"},
     {flower:"Bramble / Blackberry",months:"Jun–Aug",color:"#D4A0C0", notes:"Pale mauve-pink"},
     {flower:"Raspberry",          months:"Jun–Jul", color:"#E8C8D0", notes:"Very pale pink"},
@@ -2653,23 +2730,23 @@ const BeekeeperInfo = ({ onBack }) => {
     {flower:"Sainfoin",           months:"May–Jul", color:"#E8A8B8", notes:"Mid pink"},
     {flower:"Bird's-foot Trefoil",months:"May–Sep", color:"#F0B820", notes:"Deep yellow-orange"},
     {flower:"Rosebay Willowherb", months:"Jul–Sep", color:"#FF8FA8", notes:"Bright pink"},
-    {flower:"Willowherb (Broad-leaved)",months:"Jul–Aug",color:"#F09898", notes:"Pale warm pink"},
+    {flower:"Broad-leaved Willowherb",months:"Jul–Aug",color:"#F09898", notes:"Pale warm pink"},
     {flower:"Thistles",           months:"Jul–Sep", color:"#C898C8", notes:"Pale purple-pink"},
     {flower:"Knapweed",           months:"Jul–Sep", color:"#B888B8", notes:"Medium pink-purple"},
     {flower:"Marjoram / Oregano", months:"Jul–Sep", color:"#D8A0B8", notes:"Pink-mauve"},
     {flower:"Red Bartsia",        months:"Jun–Sep", color:"#D89898", notes:"Dull rose-pink"},
     // Mid / late summer
-    {flower:"Heather (Bell)",     months:"Jul–Sep", color:"#E890B0", notes:"Mid pink"},
-    {flower:"Heather (Ling)",     months:"Aug–Sep", color:"#C87090", notes:"Deep pink-purple"},
+    {flower:"Bell Heather",       months:"Jul–Sep", color:"#E890B0", notes:"Mid pink"},
+    {flower:"Ling Heather",       months:"Aug–Sep", color:"#C87090", notes:"Deep pink-purple"},
     {flower:"Cross-leaved Heath", months:"Jul–Sep", color:"#E8A8C0", notes:"Pale pink"},
-    {flower:"Balsam (Himalayan)", months:"Jul–Oct", color:"#F0A0C0", notes:"Pink-mauve"},
+    {flower:"Himalayan Balsam",   months:"Jul–Oct", color:"#F0A0C0", notes:"Pink-mauve"},
     {flower:"Sunflower",          months:"Jul–Sep", color:"#F0C030", notes:"Deep yellow"},
     {flower:"Sweet Clover",       months:"Jun–Aug", color:"#F0E0A0", notes:"Pale cream-yellow"},
     {flower:"Lucerne / Alfalfa",  months:"Jun–Aug", color:"#9898C8", notes:"Grey-blue violet"},
     {flower:"Lavender",           months:"Jun–Aug", color:"#B0A0C8", notes:"Pale grey-lavender"},
     {flower:"Hyssop",             months:"Jul–Sep", color:"#9890C0", notes:"Blue-violet"},
     {flower:"Catmint",            months:"Jun–Sep", color:"#B0A8D0", notes:"Pale mauve"},
-    {flower:"Woundwort (Hedge)",  months:"Jun–Oct", color:"#C890A0", notes:"Dull pink"},
+    {flower:"Hedge Woundwort",    months:"Jun–Oct", color:"#C890A0", notes:"Dull pink"},
     {flower:"Ragwort",            months:"Jun–Oct", color:"#E8C040", notes:"Deep yellow"},
     {flower:"Tansy",              months:"Jul–Oct", color:"#D8C030", notes:"Yellow-gold"},
     // Autumn
@@ -2680,6 +2757,20 @@ const BeekeeperInfo = ({ onBack }) => {
     {flower:"Sedum / Stonecrop",  months:"Aug–Oct", color:"#F8D0B0", notes:"Pale salmon-cream"},
     {flower:"Fuchsia",            months:"Jun–Oct", color:"#D068A8", notes:"Deep pink-magenta"},
     {flower:"Dahlia",             months:"Aug–Oct", color:"#E09028", notes:"Orange-yellow, varies"},
+    // North Somerset locality additions — common forage across Mendip commons, the Somerset
+    // Levels wetlands, cider orchards and hedgerows around Weston-super-Mare/Nailsea/Portishead
+    {flower:"Gorse",              months:"Jan–Jun",  color:"#F0B818", notes:"Deep golden yellow — flowers almost year-round on Mendip commons, peaks spring"},
+    {flower:"Broom",              months:"Apr–Jun",  color:"#F5D020", notes:"Bright yellow"},
+    {flower:"Ground Ivy",         months:"Mar–May",  color:"#C0A888", notes:"Dull brownish"},
+    {flower:"Green Alkanet",      months:"Mar–Jun",  color:"#A8B8D8", notes:"Pale blue-grey — common on Somerset hedgebanks"},
+    {flower:"White Dead-nettle",  months:"Mar–Nov",  color:"#E8A868", notes:"Orange-brown"},
+    {flower:"Field Bean",         months:"May–Jul",  color:"#383840", notes:"Very dark grey-black — common Somerset arable crop"},
+    {flower:"Common Comfrey",     months:"May–Aug",  color:"#585868", notes:"Blackish-grey"},
+    {flower:"Meadowsweet",        months:"Jun–Aug",  color:"#F0EAA8", notes:"Pale creamy yellow — Somerset Levels wet meadows"},
+    {flower:"Self-heal",          months:"Jun–Sep",  color:"#B0A8B8", notes:"Dull grey-mauve"},
+    {flower:"Purple Loosestrife", months:"Jun–Aug",  color:"#C8C878", notes:"Greenish-yellow — Somerset Levels ditches and rhynes"},
+    {flower:"Teasel",             months:"Jul–Aug",  color:"#F0EAD8", notes:"Pale cream-white"},
+    {flower:"Traveller's Joy",    months:"Jul–Sep",  color:"#F0EAD0", notes:"Cream-white — Old Man's Beard, common on Mendip hedgerows"},
   ];
 
   return (
@@ -2854,10 +2945,10 @@ const BeekeeperInfo = ({ onBack }) => {
 
 // ── Data Transfer Page ──────────────────────────────────────────────────────
 // APP_VERSION bumped here whenever the data schema changes — exported files carry it
-const APP_VERSION = 9;
-const APP_DISPLAY_VERSION = "v1.10.0";
+const APP_VERSION = 10;
+const APP_DISPLAY_VERSION = "v1.11.0";
 
-const DataTransfer = ({ hives, apiaries, activeApiaryId, equipManual, honeyHarvests, onImport, onBack }) => {
+const DataTransfer = ({ hives, apiaries, activeApiaryId, equipManual, honeyHarvests, showRecords, onImport, onBack }) => {
   const [importStatus,setImportStatus]=useState("");
   const [importPreview,setImportPreview]=useState(null); // parsed data preview before confirm
   const [importing,setImporting]=useState(false);
@@ -2879,6 +2970,7 @@ const DataTransfer = ({ hives, apiaries, activeApiaryId, equipManual, honeyHarve
     activeApiaryId,
     equipManual,
     honeyHarvests,
+    showRecords,
     _summary: {
       activeHives:   activeHives.length,
       archivedHives: archivedHives.length,
@@ -2887,6 +2979,7 @@ const DataTransfer = ({ hives, apiaries, activeApiaryId, equipManual, honeyHarve
       treatments:    totalTreatments,
       actions:       totalActions,
       honeyHarvests: (honeyHarvests||[]).length,
+      showRecords:   (showRecords||[]).length,
     },
   });
 
@@ -2985,6 +3078,7 @@ const DataTransfer = ({ hives, apiaries, activeApiaryId, equipManual, honeyHarve
               {label:"Treatments",     value:totalTreatments,       color:C.blue},
               {label:"Actions",        value:totalActions,          color:C.green},
               {label:"Honey Harvests", value:(honeyHarvests||[]).length, color:C.honey},
+              {label:"Show Records",   value:(showRecords||[]).length, color:"#C9A227"},
             ].map(s=>(
               <div key={s.label} style={{ background:C.bg,borderRadius:8,padding:"10px 8px",textAlign:"center" }}>
                 <div style={{ fontSize:11,color:C.textMuted,textTransform:"uppercase",letterSpacing:0.7,fontWeight:700,marginBottom:3 }}>{s.label}</div>
@@ -3043,6 +3137,7 @@ const DataTransfer = ({ hives, apiaries, activeApiaryId, equipManual, honeyHarve
                   {label:"Inspections",    value:(importPreview._summary?.inspections??importPreview.hives?.reduce((s,h)=>s+h.inspections.length,0)), color:C.orange},
                   {label:"Treatments",     value:(importPreview._summary?.treatments??importPreview.hives?.reduce((s,h)=>s+h.treatments.length,0)), color:C.blue},
                   {label:"Actions",        value:(importPreview._summary?.actions??importPreview.hives?.reduce((s,h)=>s+(h.interventions||[]).length,0)), color:C.green},
+                  {label:"Show Records",   value:(importPreview._summary?.showRecords??(importPreview.showRecords||[]).length), color:"#C9A227"},
                 ].map(s=>(
                   <div key={s.label} style={{ background:"#fff",borderRadius:8,padding:"8px 6px",textAlign:"center",border:`1px solid ${C.border}` }}>
                     <div style={{ fontSize:11,color:C.textMuted,textTransform:"uppercase",letterSpacing:0.6,fontWeight:700,marginBottom:2 }}>{s.label}</div>
@@ -3200,13 +3295,118 @@ const HoneyHarvestPage = ({ harvests, onNavigate, onBack }) => {
   );
 };
 
+// ── Show / Competition record ────────────────────────────────────────────
+const ShowRecordForm = ({ existing, onSave, onDelete, onNavigate }) => {
+  const [form,setForm]=useState(()=>existing?{...existing}:{
+    show_name:"", show_date:TODAY, show_class:"", placing:"", notes:"",
+  });
+  const [modal,setModal]=useState(null);
+  const set=(k,v)=>setForm(f=>({...f,[k]:v}));
+  const doSave=()=>{
+    if(!form.show_name.trim()){alert("Enter the show name");return;}
+    if(!form.show_date){alert("Enter the show date");return;}
+    if(!form.show_class){alert("Select a class entered");return;}
+    if(!form.placing){alert("Select a placing");return;}
+    onSave({...form,id:existing?existing.id:uid()});
+    onNavigate("show-records");
+  };
+  const cogItems=existing?[{ label:"Delete", icon:<Icon name="trash" color={C.red} size={16}/>, danger:true, onClick:()=>setModal("delete") }]:null;
+  return (
+    <PageWrap>
+      {modal==="delete"&&<ConfirmModal title="Delete this show record?" message="Permanently remove this show/competition record. This cannot be undone." confirmLabel="Yes, Delete" confirmColor={C.red}
+        onConfirm={()=>{ setModal(null); onDelete&&onDelete(existing.id); onNavigate("show-records"); }} onCancel={()=>setModal(null)}/>}
+      <PageHeader title={existing?"Edit Show Record":"Log Show / Competition"} onBack={()=>onNavigate("show-records")} rightSlot={cogItems?<CogMenu items={cogItems} iconColor={C.textSecondary}/>:null}/>
+      <div style={{ padding:16 }}>
+        <Card style={{ marginBottom:12 }}>
+          <Field label="Show Name"><Input value={form.show_name} onChange={v=>set("show_name",v)} placeholder="e.g. North Somerset Honey Show"/></Field>
+          <Field label="Show Date" style={{ marginBottom:0 }}><Input type="date" value={form.show_date} onChange={v=>set("show_date",v)}/></Field>
+        </Card>
+        <Card style={{ marginBottom:12 }}>
+          <Field label="Class Entered"><DDSelect value={form.show_class} onChange={v=>set("show_class",v)} options={SHOW_CLASSES} placeholder="Select class..."/></Field>
+          <Field label="Placing" style={{ marginBottom:0 }}>
+            <div style={{ display:"flex",gap:6,flexWrap:"wrap" }}>
+              {SHOW_PLACINGS.map(p=>(
+                <button key={p} onClick={()=>set("placing",p)}
+                  style={{ flexShrink:0,border:`1.5px solid ${form.placing===p?SHOW_PLACING_COLORS[p]:C.border}`,borderRadius:9,padding:"9px 14px",background:form.placing===p?`rgba(${hexToRgb(SHOW_PLACING_COLORS[p])},.14)`:"#fff",color:form.placing===p?SHOW_PLACING_COLORS[p]:C.textMuted,fontFamily:"'Roboto',sans-serif",fontWeight:700,fontSize:14,cursor:"pointer",transition:"all .15s" }}>
+                  {p!=="Did Not Place"&&<Icon name="rosette" color={form.placing===p?SHOW_PLACING_COLORS[p]:C.textMuted} size={14} style={{ marginRight:5,verticalAlign:"middle" }}/>}
+                  {p}
+                </button>
+              ))}
+            </div>
+          </Field>
+        </Card>
+        <Card style={{ marginBottom:16 }}>
+          <Field label="Show Notes" style={{ marginBottom:0 }}><textarea value={form.notes} onChange={e=>set("notes",e.target.value)} placeholder="Judge's comments, what worked well, what to improve next time..." style={{...inputBase,minHeight:80,resize:"vertical"}}/></Field>
+        </Card>
+        <Btn onClick={doSave} style={{ width:"100%",justifyContent:"center" }}><Icon name="check" size={17} color="#fff"/> {existing?"Update Record":"Save Record"}</Btn>
+      </div>
+    </PageWrap>
+  );
+};
+
+const ShowRecordsPage = ({ records, onNavigate, onBack }) => {
+  // Most recent first
+  const sorted=[...records].sort((a,b)=>new Date(b.show_date||0)-new Date(a.show_date||0));
+  const placingCounts=SHOW_PLACINGS.reduce((acc,p)=>({...acc,[p]:records.filter(r=>r.placing===p).length}),{});
+  return (
+    <PageWrap>
+      <PageHeader title="Show / Competition" onBack={onBack} rightSlot={<Btn small onClick={()=>onNavigate("add-show-record")}><Icon name="plus" size={14} color="#fff"/> Log</Btn>}/>
+      <div style={{ padding:16 }}>
+        {sorted.length===0?(
+          <LogoWatermark message="No show records logged yet"/>
+        ):(
+          <>
+            <Card style={{ marginBottom:14 }}>
+              <div style={{ display:"flex",justifyContent:"space-between",flexWrap:"wrap",gap:10 }}>
+                {SHOW_PLACINGS.filter(p=>p!=="Did Not Place").map(p=>(
+                  <div key={p} style={{ display:"flex",alignItems:"center",gap:6 }}>
+                    <Icon name="rosette" color={SHOW_PLACING_COLORS[p]} size={20}/>
+                    <div><div style={{ fontWeight:700,color:SHOW_PLACING_COLORS[p],fontSize:16 }}>{placingCounts[p]}</div><div style={{ fontSize:12,color:C.textMuted }}>{p}</div></div>
+                  </div>
+                ))}
+              </div>
+            </Card>
+            <div style={{ display:"flex",flexDirection:"column",gap:10 }}>
+              {sorted.map(r=>{
+                const barColor=SHOW_PLACING_COLORS[r.placing]||C.textMuted;
+                const placed=r.placing&&r.placing!=="Did Not Place";
+                return (
+                  <Card key={r.id} onClick={()=>onNavigate("edit-show-record",{recordId:r.id})}
+                    style={{ borderLeft:`4px solid ${barColor}`,paddingLeft:12,background:placed?`rgba(${hexToRgb(barColor)},.06)`:C.surface }}>
+                    <div style={{ display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:10 }}>
+                      <div style={{ flex:1,minWidth:0 }}>
+                        <div style={{ fontWeight:700,color:C.textPrimary,fontSize:16 }}>{r.show_name}</div>
+                        <div style={{ fontSize:13,color:C.textMuted,marginTop:2 }}>{fmtDate(r.show_date)}</div>
+                        <div style={{ display:"flex",gap:6,flexWrap:"wrap",marginTop:6 }}>
+                          {r.show_class&&<Chip label={r.show_class} color={C.accent} small/>}
+                        </div>
+                        {r.notes&&<div style={{ fontSize:14,color:C.textMuted,marginTop:6,fontStyle:"italic" }}>{r.notes}</div>}
+                      </div>
+                      <div style={{ textAlign:"right",flexShrink:0,display:"flex",flexDirection:"column",alignItems:"flex-end",gap:2 }}>
+                        {placed&&<Icon name="rosette" color={barColor} size={26}/>}
+                        <div style={{ fontSize:15,fontWeight:800,color:barColor }}>{r.placing}</div>
+                      </div>
+                    </div>
+                  </Card>
+                );
+              })}
+            </div>
+          </>
+        )}
+      </div>
+    </PageWrap>
+  );
+};
+
 // ── Info Hub (top-level Info page with menu items) ─────────────────────────
 const InfoHub = ({ hives, apiaries, onNavigate }) => {
   const menuItems = [
     { id:"equipment-shed", label:"Equipment Shed",    description:"Track your brood boxes, supers, feeders and more",         icon:"shed",    color:C.primary },
-    { id:"honey-harvest",  label:"Honey Harvest",     description:"Log extractions and track honey weight over time",         icon:"honeypot",color:C.honey   },
+    { id:"honey-harvest",  label:"Honey Harvest",     description:"Log extractions and track honey weight over time",         icon:"honeyjar",color:C.honey   },
+    { id:"show-records",   label:"Show / Competition", description:"Log show entries, placings and rosettes",                 icon:"rosette", color:"#C9A227" },
     { id:"beekeeper-info", label:"Beekeeper Resources", description:"Queen marking chart, bee lifecycle and UK pollen guide",  icon:"queen",   color:C.orange  },
     { id:"data-transfer",  label:"Import / Export",   description:"Back up your hive data or move it to another device",      icon:"hive",    color:C.accent  },
+    { id:"app-options",    label:"Options",           description:"App-wide settings, including the winter inspection pause", icon:"cog",     color:C.textSecondary },
     { id:"about-page",     label:"About BeeMark",     description:"A word from the creator",                                  icon:"check",   color:"#7B4FC8" },
   ];
   return (
@@ -3244,6 +3444,36 @@ const InfoHub = ({ hives, apiaries, onNavigate }) => {
   );
 };
 
+// ── Options (app-wide settings) ─────────────────────────────────────────────
+const OptionsPage = ({ winterPause, onSetWinterPause, onBack }) => {
+  return (
+    <PageWrap>
+      <PageHeader title="Options" onBack={onBack}/>
+      <div style={{ padding:16 }}>
+        <Card style={{ marginBottom:16,background:`rgba(${hexToRgb(C.red)},.06)`,border:`2px solid ${C.red}` }}>
+          <div style={{ display:"flex",alignItems:"center",gap:10,marginBottom:10 }}>
+            <Icon name="warn" color={C.red} size={20}/>
+            <div style={{ fontWeight:800,fontSize:17,color:C.red }}>Pause Inspections for Winter</div>
+          </div>
+          <div style={{ fontSize:14,color:C.textSecondary,lineHeight:1.6,marginBottom:14 }}>
+            While paused, the "Inspection Overdue" warning is switched off across the whole
+            app — no hive will be flagged as overdue and the home-screen banner won't appear.
+            You can still log inspections as normal; doing so simply updates the hive's last-inspected
+            date without triggering any overdue check. Use this over winter, when hives shouldn't
+            be opened up regardless of how long it's been since the last inspection.
+            This automatically turns itself off at the start of April each year, or you can
+            switch it off here at any time.
+          </div>
+          <div style={{ display:"flex",alignItems:"center",justifyContent:"space-between",background:"#fff",borderRadius:10,padding:"12px 14px",border:`1px solid rgba(${hexToRgb(C.red)},.25)` }}>
+            <div style={{ fontWeight:700,color:C.textPrimary,fontSize:15 }}>{winterPause?"Inspections paused for winter":"Inspections active"}</div>
+            <Toggle value={!!winterPause} onChange={onSetWinterPause} label=""/>
+          </div>
+        </Card>
+      </div>
+    </PageWrap>
+  );
+};
+
 // ── Root App ─────────────────────────────────────────────────
 export default function App() {
   const [hives,setHives]=useState([]);
@@ -3256,6 +3486,12 @@ export default function App() {
 
   const [hiveOrder,setHiveOrder]=useState([]);
   const [honeyHarvests,setHoneyHarvests]=useState([]);
+  const [showRecords,setShowRecords]=useState([]);
+  // Winter inspection pause (Options) — stops "Inspection Overdue" notifications app-wide.
+  // Inspections can still be logged as normal while paused; they just update the hive's
+  // last-inspected date without the overdue warning ever firing. Auto-disabled at the
+  // start of April each year (see isWinterPauseAutoOffWindow / the mount-effect check below).
+  const [winterPause,setWinterPause]=useState(false);
   const [equipManual,setEquipManual]=useState({
     broodBoxes_total:0, supers_total:0, queenExcluders_total:0,
     nucs_total:0, nucBroodBoxes_total:0, matingNucs_total:0, feeders_total:0, roofs_total:0, floors_total:0, crownBoards_total:0,
@@ -3265,7 +3501,7 @@ export default function App() {
   useEffect(()=>{
     (async()=>{
       await migrateFromLocalStorage();
-      const [h,a,aid,ho,em,hh,paletteMigrated,treatmentLinkMigrated] = await Promise.all([
+      const [h,a,aid,ho,em,hh,paletteMigrated,treatmentLinkMigrated,wp,sr] = await Promise.all([
         idbGet("bm_hives3",[]),
         idbGet("bm_apiaries3",null),
         idbGet("bm_activeApiary3",null),
@@ -3274,6 +3510,8 @@ export default function App() {
         idbGet("bm_honey_harvests",[]),
         idbGet("bm_palette_migrated_v2",false),
         idbGet("bm_treatment_link_migrated_v1",false),
+        idbGet("bm_winter_pause",false),
+        idbGet("bm_show_records",[]),
       ]);
       // One-time: move every hive onto the new distinguishable 12-colour palette,
       // and backfill Queen Since (for queen age tracking) from the Installed date
@@ -3323,6 +3561,15 @@ export default function App() {
       setHiveOrder(ho||[]);
       setEquipManual(prev=>({...prev,...em}));
       setHoneyHarvests(hh||[]);
+      setShowRecords(sr||[]);
+      // Winter pause auto-off: a pause left on from last winter is cleared once the
+      // Apr–Sep window is reached, rather than silently persisting year-round.
+      let winterPauseValue=!!wp;
+      if(winterPauseValue&&isWinterPauseAutoOffWindow()){
+        winterPauseValue=false;
+        idbSet("bm_winter_pause",false);
+      }
+      setWinterPause(winterPauseValue);
       setDbReady(true);
     })();
   },[]);
@@ -3334,6 +3581,8 @@ export default function App() {
   useEffect(()=>{ if(!dbReady) return; idbSet("bm_hive_order",hiveOrder); },[hiveOrder,dbReady]);
   useEffect(()=>{ if(!dbReady) return; idbSet("bm_equip_manual",equipManual); },[equipManual,dbReady]);
   useEffect(()=>{ if(!dbReady) return; idbSet("bm_honey_harvests",honeyHarvests); },[honeyHarvests,dbReady]);
+  useEffect(()=>{ if(!dbReady) return; idbSet("bm_winter_pause",winterPause); },[winterPause,dbReady]);
+  useEffect(()=>{ if(!dbReady) return; idbSet("bm_show_records",showRecords); },[showRecords,dbReady]);
 
   const handleSetManual=(k,v)=>setEquipManual(prev=>({...prev,[k]:Math.max(0,Number(v)||0)}));
 
@@ -3346,6 +3595,7 @@ export default function App() {
     setActiveApiaryId(restoredId);
     if(d.equipManual) setEquipManual(d.equipManual);
     if(d.honeyHarvests) setHoneyHarvests(d.honeyHarvests);
+    if(d.showRecords) setShowRecords(d.showRecords);
   };
 
   // Hardware/browser back button support via History API
@@ -3511,6 +3761,12 @@ export default function App() {
     // Swarm/Split: if the old (aged) queen went to another EXISTING hive tracked in
     // BeeMark (rather than a brand-new nuc), carry her queen_since over to it.
     let queenTransferTargetId=null, queenTransferSince=null;
+    // Combine Hive and Frame of Eggs Added/Removed, when logged as part of an inspection's
+    // action list, affect a SECOND hive (the receiving/combined-into hive) — this collects
+    // the reciprocal log entry to add to that other hive once the source hive's own update
+    // is done. Same create-only scope as the rest of this pre-loop pass (see Critical Rule 11).
+    let combineTargetId=null, combineDetails="";
+    const crossHiveReceipts=[]; // [{targetId, record}]
     if(isNewInspection && ins.actions){
       ins.actions.forEach(act=>{
         if(act.type==="Move Hive"&&act.move_target_id){
@@ -3526,9 +3782,29 @@ export default function App() {
           soldGivenAway=true;
           soldDetails={transferred_to:act.transferred_to||"",transfer_notes:act.transfer_notes||act.details||""};
         }
+        if(act.type==="Combine Hive"&&act.combine_target_id){
+          combineTargetId=act.combine_target_id;
+          combineDetails=act.details||"";
+          crossHiveReceipts.push({targetId:act.combine_target_id,record:{id:uid(),type:"Combine Hive",qty:"1",
+            details:`Hive "${sourceHiveBeforeSave?.name||"?"}" was combined into this hive.${act.details?" "+act.details:""}`,
+            combined_from_id:hiveId,combined_from_name:sourceHiveBeforeSave?.name||"",date:ins.date,source:"inspection"}});
+        }
+        if(act.type==="Frame of Eggs Removed"&&act.eggs_transfer_hive_id){
+          crossHiveReceipts.push({targetId:act.eggs_transfer_hive_id,record:{id:uid(),type:"Frame of Eggs Added",qty:"1",
+            details:`Frame received from ${sourceHiveBeforeSave?.name||"another hive"}${act.details?" — "+act.details:""}`,
+            eggs_source_hive_id:hiveId,eggs_source_external:false,date:ins.date,source:"inspection"}});
+        }
+        if(act.type==="Frame of Eggs Added"&&act.eggs_source_hive_id){
+          crossHiveReceipts.push({targetId:act.eggs_source_hive_id,record:{id:uid(),type:"Frame of Eggs Removed",qty:"1",
+            details:`Frame sent to ${sourceHiveBeforeSave?.name||"another hive"}${act.details?" — "+act.details:""}`,
+            eggs_transfer_hive_id:hiveId,eggs_transfer_external:false,date:ins.date,source:"inspection"}});
+        }
         if(SWARM_SPLIT_ACTIONS.includes(act.type)&&act.old_queen_location==="Hive Number"&&act.old_queen_target_hive_id){
           queenTransferTargetId=act.old_queen_target_hive_id;
           queenTransferSince=sourceHiveBeforeSave?.queen_since||"";
+          crossHiveReceipts.push({targetId:act.old_queen_target_hive_id,record:{id:uid(),type:"Added Queen",qty:"1",
+            details:`Queen received from ${sourceHiveBeforeSave?.name||"another hive"} (${act.type})${act.details?" — "+act.details:""}`,
+            date:ins.date,source:"inspection"}});
         }
       });
     }
@@ -3551,6 +3827,14 @@ export default function App() {
           } else {
             hiveUpdate={...hiveUpdate,skip_inspection_until:"",skip_inspection_reason:""};
           }
+          // Priority inspection flag — same create-only scheduling pattern as "Do not
+          // inspect" above: ticking it flags the hive (with a reason) for the hive-list
+          // tag; logging any other new inspection without it clears the flag automatically.
+          if(ins.priority_inspection){
+            hiveUpdate={...hiveUpdate,priority_inspection:true,priority_inspection_reason:ins.priority_inspection_reason||""};
+          } else {
+            hiveUpdate={...hiveUpdate,priority_inspection:false,priority_inspection_reason:""};
+          }
         }
         if(!exists){
           if(ins.has_treatment==="yes"&&ins.treatment_product) treatments=[...treatments,{id:uid(),product:ins.treatment_product,reason:ins.treatment_reason||"",notes:ins.treatment_notes||"",date:ins.treatment_date||ins.date,duration_days:ins.treatment_duration||"",tray:ins.treatment_product==="Api-Guard"?(ins.treatment_tray||"1st Tray"):"",complete:false,source:"inspection",source_inspection_id:ins.id}];
@@ -3558,7 +3842,11 @@ export default function App() {
           const actionList = ins.actions||[];
           actionList.forEach(act=>{
             if(act.type){
-              interventions=[...interventions,{id:act.id||uid(),type:act.type,qty:act.qty||"1",details:act.details||"",swarm_status:act.swarm_status||"",old_queen_location:act.old_queen_location||"",old_queen_target_hive_id:act.old_queen_target_hive_id||"",old_queen_target_hive_name:act.old_queen_target_hive_name||"",old_queen_hive_number:act.old_queen_hive_number||"",date:ins.date,source:"inspection"}];
+              interventions=[...interventions,{id:act.id||uid(),type:act.type,qty:act.qty||"1",details:act.details||"",swarm_status:act.swarm_status||"",old_queen_location:act.old_queen_location||"",old_queen_target_hive_id:act.old_queen_target_hive_id||"",old_queen_target_hive_name:act.old_queen_target_hive_name||"",old_queen_hive_number:act.old_queen_hive_number||"",
+                ...(act.type==="Combine Hive"?{combine_target_id:act.combine_target_id||"",combine_target_name:hives.find(h=>h.id===act.combine_target_id)?.name||""}:{}),
+                ...(act.type==="Frame of Eggs Removed"?{eggs_transfer_hive_id:act.eggs_transfer_hive_id||"",eggs_transfer_external:act.eggs_transfer_external||false}:{}),
+                ...(act.type==="Frame of Eggs Added"?{eggs_source_hive_id:act.eggs_source_hive_id||"",eggs_source_external:act.eggs_source_external||false}:{}),
+                date:ins.date,source:"inspection"}];
               hiveUpdate = applyActionToHive(hiveUpdate, act.type, act.qty||"1");
               // Update hive status for swarm/split
               if(act.swarm_status==="Queenless") hiveUpdate={...hiveUpdate,status:"Queenless"};
@@ -3573,6 +3861,9 @@ export default function App() {
               if(act.type==="Sold/Given Away"&&soldDetails) hiveUpdate={...hiveUpdate,status:"Archived",archivedAt:ins.date,transferred_to:soldDetails.transferred_to,transfer_notes:soldDetails.transfer_notes};
               // Shake out → archive the hive (no transfer info needed)
               if(act.type==="Shake Out") hiveUpdate={...hiveUpdate,status:"Archived",archivedAt:ins.date};
+              // Combine Hive → archive this hive with transfer info; the receiving hive's
+              // reciprocal log entry is applied after the main map (see crossHiveReceipts below)
+              if(act.type==="Combine Hive"&&combineTargetId) hiveUpdate={...hiveUpdate,status:"Archived",archivedAt:ins.date,transfer_notes:combineDetails};
             }
           });
         }
@@ -3656,7 +3947,11 @@ export default function App() {
           interventions=interventions.filter(iv=>!(oldActionIds.has(iv.id)&&!newActionIds.has(iv.id)));
           (ins.actions||[]).forEach(act=>{
             if(!act.type) return;
-            const record={id:act.id||uid(),type:act.type,qty:act.qty||"1",details:act.details||"",swarm_status:act.swarm_status||"",old_queen_location:act.old_queen_location||"",old_queen_target_hive_id:act.old_queen_target_hive_id||"",old_queen_target_hive_name:act.old_queen_target_hive_name||"",old_queen_hive_number:act.old_queen_hive_number||"",date:ins.date,source:"inspection"};
+            const record={id:act.id||uid(),type:act.type,qty:act.qty||"1",details:act.details||"",swarm_status:act.swarm_status||"",old_queen_location:act.old_queen_location||"",old_queen_target_hive_id:act.old_queen_target_hive_id||"",old_queen_target_hive_name:act.old_queen_target_hive_name||"",old_queen_hive_number:act.old_queen_hive_number||"",
+              ...(act.type==="Combine Hive"?{combine_target_id:act.combine_target_id||"",combine_target_name:hives.find(h=>h.id===act.combine_target_id)?.name||""}:{}),
+              ...(act.type==="Frame of Eggs Removed"?{eggs_transfer_hive_id:act.eggs_transfer_hive_id||"",eggs_transfer_external:act.eggs_transfer_external||false}:{}),
+              ...(act.type==="Frame of Eggs Added"?{eggs_source_hive_id:act.eggs_source_hive_id||"",eggs_source_external:act.eggs_source_external||false}:{}),
+              date:ins.date,source:"inspection"};
             const idx=interventions.findIndex(iv=>iv.id===record.id);
             if(idx!==-1) interventions[idx]=record; else interventions=[...interventions,record];
           });
@@ -3693,6 +3988,12 @@ export default function App() {
       if(newHivesToAdd.length>0) updated=[...updated,...newHivesToAdd];
       // Carry the old queen's age over to the existing hive she was transferred to
       if(queenTransferTargetId) updated=updated.map(h=>h.id===queenTransferTargetId?{...h,queen_since:queenTransferSince||""}:h);
+      // Cross-hive receiving logs: Combine Hive, Frame of Eggs Added/Removed, and a
+      // Swarm/Split queen transferred to an existing hive all affect a SECOND hive —
+      // add its reciprocal log entry now that hive still exists in `updated`.
+      crossHiveReceipts.forEach(({targetId,record})=>{
+        updated=updated.map(h=>h.id===targetId?{...h,interventions:[...(h.interventions||[]),record]}:h);
+      });
       return updated;
     });
     // Add new apiary created by "Move to New Apiary"
@@ -3745,9 +4046,16 @@ export default function App() {
   // Api-Guard 1st tray's 14 days are up — swap in the 2nd tray, restarting the
   // 14-day clock from today. The 2nd tray then auto-completes on its own once its
   // 14 days elapse (see the app-load Api-Guard reconciliation pass).
-  const addSecondApiGuardTray=(hiveId,treatId)=>{
+  const addSecondApiGuardTray=(hiveId,treatId,extraNotes)=>{
     setHives(hs=>hs.map(h=>h.id!==hiveId?h:{
-      ...h,treatments:h.treatments.map(t=>t.id===treatId?{...t,tray:"2nd Tray",date:TODAY,duration_days:"14"}:t)
+      ...h,treatments:h.treatments.map(t=>{
+        if(t.id!==treatId) return t;
+        // Optional medicine-info notes entered when adding the 2nd tray are APPENDED to
+        // the original treatment notes, never replacing what's already recorded there.
+        const trimmedExtra=(extraNotes||"").trim();
+        const notes=trimmedExtra?(t.notes?t.notes+"\n"+trimmedExtra:trimmedExtra):t.notes;
+        return {...t,tray:"2nd Tray",date:TODAY,duration_days:"14",notes};
+      })
     }));
   };
   const moveHive=(hiveId,form)=>{
@@ -3792,6 +4100,8 @@ export default function App() {
   };
   const saveHoneyHarvest=record=>setHoneyHarvests(hh=>hh.find(x=>x.id===record.id)?hh.map(x=>x.id===record.id?record:x):[...hh,record]);
   const deleteHoneyHarvest=id=>setHoneyHarvests(hh=>hh.filter(x=>x.id!==id));
+  const saveShowRecord=record=>setShowRecords(sr=>sr.find(x=>x.id===record.id)?sr.map(x=>x.id===record.id?record:x):[...sr,record]);
+  const deleteShowRecord=id=>setShowRecords(sr=>sr.filter(x=>x.id!==id));
   const saveApiary=updated=>setApiaries(as=>as.map(a=>a.id===updated.id?updated:a));
   const addApiary=a=>{ setApiaries(as=>[...as,a]); setActiveApiaryId(a.id); };
   const deleteApiary=id=>{ const rem=apiaries.filter(a=>a.id!==id); setApiaries(rem); setHives(hs=>hs.filter(h=>h.apiaryId!==id)); if(rem.length>0) setActiveApiaryId(rem[0].id); };
@@ -3808,7 +4118,7 @@ export default function App() {
   });
 
   let content=null;
-  if(screen==="hives"||screen==="dashboard") content=<HiveList hives={hives} apiaries={apiaries} activeApiaryId={activeApiaryId||currentApiaryId} onSelectApiary={setActiveApiaryId} onNavigate={navigate} customOrder={hiveOrder} onReorder={setHiveOrder}/>;
+  if(screen==="hives"||screen==="dashboard") content=<HiveList hives={hives} apiaries={apiaries} activeApiaryId={activeApiaryId||currentApiaryId} onSelectApiary={setActiveApiaryId} onNavigate={navigate} customOrder={hiveOrder} onReorder={setHiveOrder} winterPause={winterPause}/>;
   else if(screen==="apiary-settings") content=<ApiarySettings apiaries={apiaries} hives={hives} activeApiaryId={currentApiaryId} onSaveApiary={saveApiary} onAddApiary={addApiary} onDeleteApiary={deleteApiary} onSelectApiary={setActiveApiaryId} onNavigate={navigate}/>;
   else if(screen==="apiary-detail")   { const a=apiaries.find(x=>x.id===params.apiaryId); if(a) content=<ApiaryDetail apiary={a} hives={hives} onBack={goBack} onEdit={()=>navigate("apiary-edit",{apiaryId:a.id})} onDelete={id=>{ deleteApiary(id); navigate("apiary-settings"); }} onSaveNotes={saveApiary} onNavigate={navigate} customOrder={hiveOrder}/>; }
   else if(screen==="apiary-edit")     { const a=apiaries.find(x=>x.id===params.apiaryId); if(a) content=<ApiaryEdit apiary={a} onSave={a2=>{ saveApiary(a2); navigate("apiary-detail",{apiaryId:a2.id}); }} onCancel={()=>navigate("apiary-detail",{apiaryId:a.id})}/>; }
@@ -3827,6 +4137,9 @@ export default function App() {
   else if(screen==="honey-harvest")   content=<HoneyHarvestPage harvests={honeyHarvests} onNavigate={navigate} onBack={()=>navigate("info-hub")}/>
   else if(screen==="add-honey-harvest") content=<HoneyHarvestForm onSave={saveHoneyHarvest} onNavigate={navigate}/>
   else if(screen==="edit-honey-harvest"){ const hh=honeyHarvests.find(x=>x.id===params.harvestId); if(hh) content=<HoneyHarvestForm existing={hh} onSave={saveHoneyHarvest} onDelete={deleteHoneyHarvest} onNavigate={navigate}/>; }
+  else if(screen==="show-records")    content=<ShowRecordsPage records={showRecords} onNavigate={navigate} onBack={()=>navigate("info-hub")}/>
+  else if(screen==="add-show-record") content=<ShowRecordForm onSave={saveShowRecord} onNavigate={navigate}/>
+  else if(screen==="edit-show-record"){ const sr=showRecords.find(x=>x.id===params.recordId); if(sr) content=<ShowRecordForm existing={sr} onSave={saveShowRecord} onDelete={deleteShowRecord} onNavigate={navigate}/>; }
   else if(screen==="beekeeper-info")  content=<BeekeeperInfo onBack={()=>navigate("info-hub")}/>
   else if(screen==="data-transfer")   content=<DataTransfer
     hives={hives}
@@ -3838,13 +4151,15 @@ export default function App() {
       navigate("hives");
     }}
     honeyHarvests={honeyHarvests}
+    showRecords={showRecords}
     onBack={()=>navigate("info-hub")}/>
   else if(screen==="about-page")      content=<AboutPage onBack={()=>navigate("info-hub")}/>;
+  else if(screen==="app-options")     content=<OptionsPage winterPause={winterPause} onSetWinterPause={setWinterPause} onBack={()=>navigate("info-hub")}/>;
   else if(screen==="add-treatment")   { const h=getHive(params.hiveId); if(h) content=<TreatmentForm hive={h} onSave={saveExtra} onNavigate={navigate}/>; }
   else if(screen==="edit-treatment")  { const h=getHive(params.hiveId); const t=h&&h.treatments.find(x=>x.id===params.treatmentId); if(h&&t) content=<TreatmentForm hive={h} existing={t} onUpdate={updateTreatment} onDelete={deleteTreatment} onNavigate={navigate}/>; }
   else if(screen==="add-intervention"){ const h=getHive(params.hiveId); if(h) content=<ActionForm    hive={h} onSave={saveExtra} onNavigate={navigate} apiaries={apiaries||[]} hives={hives||[]} onMoveHive={moveHive} onSoldHive={soldHive} onShakeOutHive={shakeOutHive} onCombineHive={combineHive} onFrameEggsAction={frameEggsAction}/>; }
   else if(screen==="edit-intervention"){ const h=getHive(params.hiveId); const iv=h&&(h.interventions||[]).find(x=>x.id===params.interventionId); if(h&&iv) content=<ActionForm hive={h} existing={iv} onUpdate={updateIntervention} onDelete={deleteIntervention} onNavigate={navigate} apiaries={apiaries||[]} hives={hives||[]}/>; }
-  if(!content) content=<HiveList hives={hives} apiaries={apiaries} activeApiaryId={activeApiaryId||currentApiaryId} onSelectApiary={setActiveApiaryId} onNavigate={navigate} customOrder={hiveOrder} onReorder={setHiveOrder}/>;
+  if(!content) content=<HiveList hives={hives} apiaries={apiaries} activeApiaryId={activeApiaryId||currentApiaryId} onSelectApiary={setActiveApiaryId} onNavigate={navigate} customOrder={hiveOrder} onReorder={setHiveOrder} winterPause={winterPause}/>;
 
   if(!dbReady) return (
     <div style={{fontFamily:"'Roboto',sans-serif",minHeight:"100vh",maxWidth:480,margin:"0 auto",display:"flex",alignItems:"center",justifyContent:"center",background:C.bg}}>
@@ -3862,7 +4177,7 @@ export default function App() {
       <div style={{ position:"fixed",bottom:0,left:"50%",transform:"translateX(-50%)",width:"100%",maxWidth:480,background:"rgba(255,255,255,.96)",borderTop:`1.5px solid ${C.border}`,backdropFilter:"blur(20px)",display:"flex",zIndex:100,boxShadow:"0 -2px 12px rgba(0,0,0,.07)" }}>
         {NAV_ITEMS.map(item=>{
           const apiaryScreens=["apiary-settings","apiary-detail","apiary-edit","apiary-add"];
-          const isActive=screen===item.id||(item.id==="hives"&&(screen==="hives"||screen==="dashboard"||hiveScreens.includes(screen)))||(item.id==="apiary-settings"&&apiaryScreens.includes(screen))||(item.id==="info-hub"&&(screen==="info-hub"||screen==="equipment-shed"||screen==="honey-harvest"||screen==="add-honey-harvest"||screen==="edit-honey-harvest"||screen==="beekeeper-info"||screen==="data-transfer"||screen==="about-page"));
+          const isActive=screen===item.id||(item.id==="hives"&&(screen==="hives"||screen==="dashboard"||hiveScreens.includes(screen)))||(item.id==="apiary-settings"&&apiaryScreens.includes(screen))||(item.id==="info-hub"&&(screen==="info-hub"||screen==="equipment-shed"||screen==="honey-harvest"||screen==="add-honey-harvest"||screen==="edit-honey-harvest"||screen==="show-records"||screen==="add-show-record"||screen==="edit-show-record"||screen==="beekeeper-info"||screen==="data-transfer"||screen==="about-page"||screen==="app-options"));
           return (
             <button key={item.id} onClick={()=>navigate(item.id)} style={{ flex:1,background:"none",border:"none",cursor:"pointer",padding:"10px 4px 8px",display:"flex",flexDirection:"column",alignItems:"center",gap:3,color:isActive?C.primary:C.textMuted,fontFamily:"'Roboto',sans-serif" }}>
               <div style={{ position:"relative" }}>
