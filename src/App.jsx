@@ -93,6 +93,15 @@ const SHOW_CLASSES = ["Light Honey","Medium Honey","Dark Honey","Set Honey","Liq
 const SHOW_PLACINGS = ["1st","2nd","3rd","Did Not Place"];
 // Gold / silver / bronze — used for both the rosette icon and the record's colour bar
 const SHOW_PLACING_COLORS = { "1st":"#C9A227", "2nd":"#9AA0A6", "3rd":"#B0703A", "Did Not Place":C.textMuted };
+// A show can have multiple class entries; getShowEntries() normalises both the current
+// { entries:[{id,show_class,placing}] } shape and pre-multi-class records that still carry
+// a single top-level show_class/placing pair, so old saved data keeps displaying correctly.
+const getShowEntries = r => (r.entries && r.entries.length) ? r.entries : (r.show_class ? [{ id:r.id, show_class:r.show_class, placing:r.placing }] : []);
+const getBestPlacing = entries => {
+  let best = null;
+  entries.forEach(e => { if(e.placing && (best===null || SHOW_PLACINGS.indexOf(e.placing) < SHOW_PLACINGS.indexOf(best))) best = e.placing; });
+  return best;
+};
 
 const HIVE_TYPES    = ["National","Deep National","Commercial","Langstroth","Mating Nuc (Apidea)"];
 const HIVE_STATUSES = ["Queenless","Requeening","Archived"];
@@ -3297,17 +3306,29 @@ const HoneyHarvestPage = ({ harvests, onNavigate, onBack }) => {
 
 // ── Show / Competition record ────────────────────────────────────────────
 const ShowRecordForm = ({ existing, onSave, onDelete, onNavigate }) => {
-  const [form,setForm]=useState(()=>existing?{...existing}:{
-    show_name:"", show_date:TODAY, show_class:"", placing:"", notes:"",
+  const mkEntry=(e)=>({ id:e?.id||uid(), show_class:e?.show_class||"", placing:e?.placing||"" });
+  const [form,setForm]=useState(()=>existing?{ show_name:existing.show_name||"", show_date:existing.show_date||TODAY, notes:existing.notes||"" }:{
+    show_name:"", show_date:TODAY, notes:"",
+  });
+  const [entries,setEntries]=useState(()=>{
+    if(existing){
+      const ex=getShowEntries(existing);
+      return ex.length?ex.map(mkEntry):[mkEntry()];
+    }
+    return [mkEntry()];
   });
   const [modal,setModal]=useState(null);
   const set=(k,v)=>setForm(f=>({...f,[k]:v}));
+  const setEntry=(id,k,v)=>setEntries(es=>es.map(e=>e.id===id?{...e,[k]:v}:e));
+  const addEntry=()=>setEntries(es=>[...es,mkEntry()]);
+  const removeEntry=id=>setEntries(es=>es.length>1?es.filter(e=>e.id!==id):es);
   const doSave=()=>{
     if(!form.show_name.trim()){alert("Enter the show name");return;}
     if(!form.show_date){alert("Enter the show date");return;}
-    if(!form.show_class){alert("Select a class entered");return;}
-    if(!form.placing){alert("Select a placing");return;}
-    onSave({...form,id:existing?existing.id:uid()});
+    const filled=entries.filter(e=>e.show_class);
+    if(!filled.length){alert("Select at least one class entered");return;}
+    if(filled.some(e=>!e.placing)){alert("Select a placing for every class entered");return;}
+    onSave({ ...form, id:existing?existing.id:uid(), entries:filled });
     onNavigate("show-records");
   };
   const cogItems=existing?[{ label:"Delete", icon:<Icon name="trash" color={C.red} size={16}/>, danger:true, onClick:()=>setModal("delete") }]:null;
@@ -3321,20 +3342,27 @@ const ShowRecordForm = ({ existing, onSave, onDelete, onNavigate }) => {
           <Field label="Show Name"><Input value={form.show_name} onChange={v=>set("show_name",v)} placeholder="e.g. North Somerset Honey Show"/></Field>
           <Field label="Show Date" style={{ marginBottom:0 }}><Input type="date" value={form.show_date} onChange={v=>set("show_date",v)}/></Field>
         </Card>
-        <Card style={{ marginBottom:12 }}>
-          <Field label="Class Entered"><DDSelect value={form.show_class} onChange={v=>set("show_class",v)} options={SHOW_CLASSES} placeholder="Select class..."/></Field>
-          <Field label="Placing" style={{ marginBottom:0 }}>
-            <div style={{ display:"flex",gap:6,flexWrap:"wrap" }}>
-              {SHOW_PLACINGS.map(p=>(
-                <button key={p} onClick={()=>set("placing",p)}
-                  style={{ flexShrink:0,border:`1.5px solid ${form.placing===p?SHOW_PLACING_COLORS[p]:C.border}`,borderRadius:9,padding:"9px 14px",background:form.placing===p?`rgba(${hexToRgb(SHOW_PLACING_COLORS[p])},.14)`:"#fff",color:form.placing===p?SHOW_PLACING_COLORS[p]:C.textMuted,fontFamily:"'Roboto',sans-serif",fontWeight:700,fontSize:14,cursor:"pointer",transition:"all .15s" }}>
-                  {p!=="Did Not Place"&&<Icon name="rosette" color={form.placing===p?SHOW_PLACING_COLORS[p]:C.textMuted} size={14} style={{ marginRight:5,verticalAlign:"middle" }}/>}
-                  {p}
-                </button>
-              ))}
+        {entries.map((entry,i)=>(
+          <Card key={entry.id} style={{ marginBottom:12 }}>
+            <div style={{ display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:2 }}>
+              <div style={{ fontSize:13,fontWeight:700,color:C.textSecondary }}>Class {i+1}</div>
+              {entries.length>1&&<button onClick={()=>removeEntry(entry.id)} style={{ background:"none",border:"none",cursor:"pointer",padding:4,display:"flex" }}><Icon name="trash" color={C.textMuted} size={16}/></button>}
             </div>
-          </Field>
-        </Card>
+            <Field label="Class Entered"><DDSelect value={entry.show_class} onChange={v=>setEntry(entry.id,"show_class",v)} options={SHOW_CLASSES} placeholder="Select class..."/></Field>
+            <Field label="Placing" style={{ marginBottom:0 }}>
+              <div style={{ display:"flex",gap:6,flexWrap:"wrap" }}>
+                {SHOW_PLACINGS.map(p=>(
+                  <button key={p} onClick={()=>setEntry(entry.id,"placing",p)}
+                    style={{ flexShrink:0,border:`1.5px solid ${entry.placing===p?SHOW_PLACING_COLORS[p]:C.border}`,borderRadius:9,padding:"9px 14px",background:entry.placing===p?`rgba(${hexToRgb(SHOW_PLACING_COLORS[p])},.14)`:"#fff",color:entry.placing===p?SHOW_PLACING_COLORS[p]:C.textMuted,fontFamily:"'Roboto',sans-serif",fontWeight:700,fontSize:14,cursor:"pointer",transition:"all .15s" }}>
+                    {p!=="Did Not Place"&&<Icon name="rosette" color={entry.placing===p?SHOW_PLACING_COLORS[p]:C.textMuted} size={14} style={{ marginRight:5,verticalAlign:"middle" }}/>}
+                    {p}
+                  </button>
+                ))}
+              </div>
+            </Field>
+          </Card>
+        ))}
+        <Btn variant="ghost" onClick={addEntry} style={{ width:"100%",justifyContent:"center",marginBottom:12 }}><Icon name="plus" size={15} color={C.primary}/> Add Another Class</Btn>
         <Card style={{ marginBottom:16 }}>
           <Field label="Show Notes" style={{ marginBottom:0 }}><textarea value={form.notes} onChange={e=>set("notes",e.target.value)} placeholder="Judge's comments, what worked well, what to improve next time..." style={{...inputBase,minHeight:80,resize:"vertical"}}/></Field>
         </Card>
@@ -3344,10 +3372,12 @@ const ShowRecordForm = ({ existing, onSave, onDelete, onNavigate }) => {
   );
 };
 
+
 const ShowRecordsPage = ({ records, onNavigate, onBack }) => {
   // Most recent first
   const sorted=[...records].sort((a,b)=>new Date(b.show_date||0)-new Date(a.show_date||0));
-  const placingCounts=SHOW_PLACINGS.reduce((acc,p)=>({...acc,[p]:records.filter(r=>r.placing===p).length}),{});
+  const allEntries=records.flatMap(getShowEntries);
+  const placingCounts=SHOW_PLACINGS.reduce((acc,p)=>({...acc,[p]:allEntries.filter(e=>e.placing===p).length}),{});
   return (
     <PageWrap>
       <PageHeader title="Show / Competition" onBack={onBack} rightSlot={<Btn small onClick={()=>onNavigate("add-show-record")}><Icon name="plus" size={14} color="#fff"/> Log</Btn>}/>
@@ -3368,8 +3398,11 @@ const ShowRecordsPage = ({ records, onNavigate, onBack }) => {
             </Card>
             <div style={{ display:"flex",flexDirection:"column",gap:10 }}>
               {sorted.map(r=>{
-                const barColor=SHOW_PLACING_COLORS[r.placing]||C.textMuted;
-                const placed=r.placing&&r.placing!=="Did Not Place";
+                const entries=getShowEntries(r);
+                const bestPlacing=getBestPlacing(entries);
+                const barColor=SHOW_PLACING_COLORS[bestPlacing]||C.textMuted;
+                const placed=bestPlacing&&bestPlacing!=="Did Not Place";
+                const wonEntries=entries.filter(e=>e.placing&&e.placing!=="Did Not Place");
                 return (
                   <Card key={r.id} onClick={()=>onNavigate("edit-show-record",{recordId:r.id})}
                     style={{ borderLeft:`4px solid ${barColor}`,paddingLeft:12,background:placed?`rgba(${hexToRgb(barColor)},.06)`:C.surface }}>
@@ -3378,13 +3411,23 @@ const ShowRecordsPage = ({ records, onNavigate, onBack }) => {
                         <div style={{ fontWeight:700,color:C.textPrimary,fontSize:16 }}>{r.show_name}</div>
                         <div style={{ fontSize:13,color:C.textMuted,marginTop:2 }}>{fmtDate(r.show_date)}</div>
                         <div style={{ display:"flex",gap:6,flexWrap:"wrap",marginTop:6 }}>
-                          {r.show_class&&<Chip label={r.show_class} color={C.accent} small/>}
+                          {entries.map(e=>e.show_class&&<Chip key={e.id} label={e.show_class} color={C.accent} small/>)}
                         </div>
+                        {wonEntries.length>0&&(
+                          <div style={{ display:"flex",flexWrap:"wrap",gap:10,marginTop:8 }}>
+                            {wonEntries.map(e=>(
+                              <div key={e.id} style={{ display:"flex",alignItems:"center",gap:4 }}>
+                                <Icon name="rosette" color={SHOW_PLACING_COLORS[e.placing]} size={16}/>
+                                <span style={{ fontSize:12,fontWeight:700,color:SHOW_PLACING_COLORS[e.placing] }}>{e.placing} · {e.show_class}</span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
                         {r.notes&&<div style={{ fontSize:14,color:C.textMuted,marginTop:6,fontStyle:"italic" }}>{r.notes}</div>}
                       </div>
                       <div style={{ textAlign:"right",flexShrink:0,display:"flex",flexDirection:"column",alignItems:"flex-end",gap:2 }}>
                         {placed&&<Icon name="rosette" color={barColor} size={26}/>}
-                        <div style={{ fontSize:15,fontWeight:800,color:barColor }}>{r.placing}</div>
+                        {bestPlacing&&<div style={{ fontSize:15,fontWeight:800,color:barColor }}>{bestPlacing}</div>}
                       </div>
                     </div>
                   </Card>
