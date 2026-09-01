@@ -26,7 +26,7 @@ BeeMark is a practical, no-fuss beekeeping companion designed for real-world use
 No account required. No subscription. No data leaves your device.
 
 Available as:
-- **A web app / installable PWA** — hosted on GitHub Pages
+- **A web app / installable PWA** — [hosted on GitHub Pages](https://sdewer.github.io/BeeMark/)
 - **An Android APK** — built with Capacitor for a native install experience
 
 ---
