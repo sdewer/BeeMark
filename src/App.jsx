@@ -9,7 +9,7 @@ const C = {
   statusQueenless:"#E53935", statusRequeening:"#F57C00",
   statusArchived:"#9BB5AC",
   green:"#2DBD8F", red:"#E53935", orange:"#F57C00", blue:"#3B9EE8",
-  honey:"#F2A93B",
+  honey:"#F2A93B", purple:"#8E5BC7",
   border:"#DDE9E5", borderFocus:"#2DBD8F",
 };
 const hexToRgb = hex => { const r=parseInt(hex.slice(1,3),16),g=parseInt(hex.slice(3,5),16),b=parseInt(hex.slice(5,7),16); return `${r},${g},${b}`; };
@@ -91,15 +91,22 @@ const lbToKg = lb => lb*KG_PER_LB;
 // Show / Competition records — honey show classes commonly judged at UK BKA shows
 const SHOW_CLASSES = ["Light Honey","Medium Honey","Dark Honey","Set Honey","Liquid Honey","Cut Comb","Wax Blocks","Wax Candles","Honey Cake","Honey Shortbread","Honey Fudge","Mead"];
 const SHOW_PLACINGS = ["1st","2nd","3rd","Did Not Place"];
-// Gold / silver / bronze — used for both the rosette icon and the record's colour bar
-const SHOW_PLACING_COLORS = { "1st":"#C9A227", "2nd":"#9AA0A6", "3rd":"#B0703A", "Did Not Place":C.textMuted };
+// Gold / silver / bronze — used for both the rosette icon and the record's colour bar.
+// Best in Show is not a selectable initial placing (an entry can only be promoted to it
+// from 1st, via the pop-up / toggle in ShowRecordForm) but ranks above everything else.
+const SHOW_PLACING_COLORS = { "Best in Show":C.purple, "1st":"#C9A227", "2nd":"#9AA0A6", "3rd":"#B0703A", "Did Not Place":C.textMuted };
+// Highest-to-lowest display/ranking order, including the derived "Best in Show" tier.
+const SHOW_RANK_ORDER = ["Best in Show","1st","2nd","3rd","Did Not Place"];
 // A show can have multiple class entries; getShowEntries() normalises both the current
-// { entries:[{id,show_class,placing}] } shape and pre-multi-class records that still carry
-// a single top-level show_class/placing pair, so old saved data keeps displaying correctly.
-const getShowEntries = r => (r.entries && r.entries.length) ? r.entries : (r.show_class ? [{ id:r.id, show_class:r.show_class, placing:r.placing }] : []);
+// { entries:[{id,show_class,placing,best_in_show}] } shape and pre-multi-class records that
+// still carry a single top-level show_class/placing pair, so old saved data keeps displaying correctly.
+const getShowEntries = r => (r.entries && r.entries.length) ? r.entries : (r.show_class ? [{ id:r.id, show_class:r.show_class, placing:r.placing, best_in_show:!!r.best_in_show }] : []);
+// An entry's effective rank for display/ordering/colouring — Best in Show overrides its
+// underlying 1st-place placing.
+const getEntryRank = e => (e && e.best_in_show) ? "Best in Show" : (e && e.placing) || null;
 const getBestPlacing = entries => {
   let best = null;
-  entries.forEach(e => { if(e.placing && (best===null || SHOW_PLACINGS.indexOf(e.placing) < SHOW_PLACINGS.indexOf(best))) best = e.placing; });
+  (entries||[]).forEach(e => { const r=getEntryRank(e); if(r && (best===null || SHOW_RANK_ORDER.indexOf(r) < SHOW_RANK_ORDER.indexOf(best))) best = r; });
   return best;
 };
 
@@ -468,9 +475,14 @@ const SectionHead = ({ label }) => (
   <div style={{ fontWeight:700,color:C.textPrimary,fontSize:16,marginBottom:14,paddingBottom:8,borderBottom:`1px solid ${C.border}` }}>{label}</div>
 );
 const HexBg = ({ opacity=0.045 }) => (
+  // A mathematically verified true honeycomb tiling (generated + checked for seamless
+  // edge-sharing between adjacent hexagons) rather than a single non-tessellating hexagon.
   <svg style={{ position:"fixed",top:0,left:0,width:"100%",height:"100%",opacity,pointerEvents:"none",zIndex:0 }} xmlns="http://www.w3.org/2000/svg">
-    <defs><pattern id="hex" x="0" y="0" width="60" height="52" patternUnits="userSpaceOnUse">
-      <polygon points="30,2 58,17 58,47 30,62 2,47 2,17" fill="none" stroke={C.primary} strokeWidth="1.5"/>
+    <defs><pattern id="hex" x="0" y="0" width="34.64" height="60" patternUnits="userSpaceOnUse">
+      <polyline points="0,0 17.32,10 34.64,0" fill="none" stroke={C.primary} strokeWidth="1.5"/>
+      <polyline points="17.32,10 17.32,30" fill="none" stroke={C.primary} strokeWidth="1.5"/>
+      <polyline points="34.64,40 17.32,30 0,40 0,60" fill="none" stroke={C.primary} strokeWidth="1.5"/>
+      <polyline points="34.64,40 34.64,60" fill="none" stroke={C.primary} strokeWidth="1.5"/>
     </pattern></defs>
     <rect width="100%" height="100%" fill="url(#hex)"/>
   </svg>
@@ -1888,7 +1900,8 @@ const InspectionForm = ({ hive, existing, onSave, onNavigate, onMarkTreatmentCom
   const [form,setForm]=useState(()=>{
     const base = existing||{...INSPECTION_DEFAULTS,id:uid(),date:TODAY,inspector:""};
     const {dropdownValue,otherText}=resolveTreatmentProductUI(base.treatment_product);
-    return {...base, treatment_product_select:dropdownValue, treatment_product_other:base.treatment_product_other||otherText};
+    return {...base, treatment_product_select:dropdownValue, treatment_product_other:base.treatment_product_other||otherText,
+      new_queen_year: base.new_queen_year || String(new Date().getFullYear())};
   });
   const set=(k,v)=>setForm(f=>({...f,[k]:v}));
   // Api-Guard "Add 2nd Tray" — optional medicine-info notes entered at that point are
@@ -2150,7 +2163,7 @@ const InspectionForm = ({ hive, existing, onSave, onNavigate, onMarkTreatmentCom
                   ):(
                     <button onClick={()=>onMarkTreatmentComplete(hive.id,t.id)}
                       style={{ background:`rgba(${hexToRgb(C.green)},.1)`,border:`1px solid ${C.green}`,borderRadius:8,padding:"6px 12px",color:C.green,fontFamily:"'Roboto',sans-serif",fontWeight:600,fontSize:14,cursor:"pointer" }}>
-                      Mark Complete
+                      Complete &amp; Remove
                     </button>
                   )}
                 </div>
@@ -2478,6 +2491,12 @@ const ActionForm = ({ hive, existing, onSave, onUpdate, onDelete, onNavigate, ap
               {form.eggs_source_external&&<div style={{ fontSize:13,color:C.textMuted,marginBottom:6,padding:"6px 10px",background:"rgba(0,0,0,.04)",borderRadius:8 }}>Frame received from a hive outside this apiary — only this hive will be logged.</div>}
               {form.eggs_source_hive_id&&hives.find(h=>h.id===form.eggs_source_hive_id)&&<div style={{ fontSize:13,color:C.accent,marginBottom:6,padding:"6px 10px",background:`rgba(59,158,232,.07)`,borderRadius:8 }}>A "Frame of Eggs Removed" action will also be logged in {hives.find(h=>h.id===form.eggs_source_hive_id).name}.</div>}
             </div>
+          )}
+          {form.type==="Feed"&&(
+            <Field label="Treat as Inspection" style={{ marginBottom:0 }}>
+              <Toggle value={!!form.treat_as_inspection} onChange={v=>set("treat_as_inspection",v)} label="Count this as a hive inspection"/>
+              <div style={{ fontSize:13,color:C.textMuted,marginTop:6,lineHeight:1.5 }}>Updates this hive's last-inspected date in the hive list. Does not trigger any queenright checks.</div>
+            </Field>
           )}
           <Field label="Details" style={{ marginBottom:0 }}><textarea value={form.details} onChange={e=>set("details",e.target.value)} placeholder="Describe what was done..." style={{...inputBase,minHeight:100,resize:"vertical"}}/></Field>
         </Card>
@@ -2954,8 +2973,8 @@ const BeekeeperInfo = ({ onBack }) => {
 
 // ── Data Transfer Page ──────────────────────────────────────────────────────
 // APP_VERSION bumped here whenever the data schema changes — exported files carry it
-const APP_VERSION = 10;
-const APP_DISPLAY_VERSION = "v1.11.0";
+const APP_VERSION = 11;
+const APP_DISPLAY_VERSION = "v1.12.0";
 
 const DataTransfer = ({ hives, apiaries, activeApiaryId, equipManual, honeyHarvests, showRecords, onImport, onBack }) => {
   const [importStatus,setImportStatus]=useState("");
@@ -3306,7 +3325,7 @@ const HoneyHarvestPage = ({ harvests, onNavigate, onBack }) => {
 
 // ── Show / Competition record ────────────────────────────────────────────
 const ShowRecordForm = ({ existing, onSave, onDelete, onNavigate }) => {
-  const mkEntry=(e)=>({ id:e?.id||uid(), show_class:e?.show_class||"", placing:e?.placing||"" });
+  const mkEntry=(e)=>({ id:e?.id||uid(), show_class:e?.show_class||"", placing:e?.placing||"", best_in_show:!!e?.best_in_show });
   const [form,setForm]=useState(()=>existing?{ show_name:existing.show_name||"", show_date:existing.show_date||TODAY, notes:existing.notes||"" }:{
     show_name:"", show_date:TODAY, notes:"",
   });
@@ -3318,10 +3337,19 @@ const ShowRecordForm = ({ existing, onSave, onDelete, onNavigate }) => {
     return [mkEntry()];
   });
   const [modal,setModal]=useState(null);
+  // An entry can only win Best in Show once it has placed 1st — selecting 1st pops a
+  // confirm dialog to assign it (default: No). bisPromptFor holds the entry id awaiting
+  // that choice.
+  const [bisPromptFor,setBisPromptFor]=useState(null);
   const set=(k,v)=>setForm(f=>({...f,[k]:v}));
   const setEntry=(id,k,v)=>setEntries(es=>es.map(e=>e.id===id?{...e,[k]:v}:e));
   const addEntry=()=>setEntries(es=>[...es,mkEntry()]);
   const removeEntry=id=>setEntries(es=>es.length>1?es.filter(e=>e.id!==id):es);
+  const choosePlacing=(entry,p)=>{
+    const wasFirst=entry.placing==="1st";
+    setEntries(es=>es.map(e=>e.id===entry.id?{...e,placing:p,best_in_show:p==="1st"?e.best_in_show:false}:e));
+    if(p==="1st"&&!wasFirst) setBisPromptFor(entry.id);
+  };
   const doSave=()=>{
     if(!form.show_name.trim()){alert("Enter the show name");return;}
     if(!form.show_date){alert("Enter the show date");return;}
@@ -3349,10 +3377,10 @@ const ShowRecordForm = ({ existing, onSave, onDelete, onNavigate }) => {
               {entries.length>1&&<button onClick={()=>removeEntry(entry.id)} style={{ background:"none",border:"none",cursor:"pointer",padding:4,display:"flex" }}><Icon name="trash" color={C.textMuted} size={16}/></button>}
             </div>
             <Field label="Class Entered"><DDSelect value={entry.show_class} onChange={v=>setEntry(entry.id,"show_class",v)} options={SHOW_CLASSES} placeholder="Select class..."/></Field>
-            <Field label="Placing" style={{ marginBottom:0 }}>
+            <Field label="Placing" style={{ marginBottom:entry.placing==="1st"?10:0 }}>
               <div style={{ display:"flex",gap:6,flexWrap:"wrap" }}>
                 {SHOW_PLACINGS.map(p=>(
-                  <button key={p} onClick={()=>setEntry(entry.id,"placing",p)}
+                  <button key={p} onClick={()=>choosePlacing(entry,p)}
                     style={{ flexShrink:0,border:`1.5px solid ${entry.placing===p?SHOW_PLACING_COLORS[p]:C.border}`,borderRadius:9,padding:"9px 14px",background:entry.placing===p?`rgba(${hexToRgb(SHOW_PLACING_COLORS[p])},.14)`:"#fff",color:entry.placing===p?SHOW_PLACING_COLORS[p]:C.textMuted,fontFamily:"'Roboto',sans-serif",fontWeight:700,fontSize:14,cursor:"pointer",transition:"all .15s" }}>
                     {p!=="Did Not Place"&&<Icon name="rosette" color={entry.placing===p?SHOW_PLACING_COLORS[p]:C.textMuted} size={14} style={{ marginRight:5,verticalAlign:"middle" }}/>}
                     {p}
@@ -3360,8 +3388,19 @@ const ShowRecordForm = ({ existing, onSave, onDelete, onNavigate }) => {
                 ))}
               </div>
             </Field>
+            {entry.placing==="1st"&&(
+              <div style={{ paddingTop:2 }}>
+                <Toggle value={!!entry.best_in_show} onChange={v=>setEntry(entry.id,"best_in_show",v)} label="Best in Show"/>
+              </div>
+            )}
           </Card>
         ))}
+        {bisPromptFor&&(
+          <ConfirmModal title="Best in Show?" message="This entry placed 1st in its class — assign it Best in Show for this show?"
+            confirmLabel="Yes, Best in Show" confirmColor={C.purple}
+            onConfirm={()=>{ setEntry(bisPromptFor,"best_in_show",true); setBisPromptFor(null); }}
+            onCancel={()=>setBisPromptFor(null)}/>
+        )}
         <Btn variant="ghost" onClick={addEntry} style={{ width:"100%",justifyContent:"center",marginBottom:12 }}><Icon name="plus" size={15} color={C.primary}/> Add Another Class</Btn>
         <Card style={{ marginBottom:16 }}>
           <Field label="Show Notes" style={{ marginBottom:0 }}><textarea value={form.notes} onChange={e=>set("notes",e.target.value)} placeholder="Judge's comments, what worked well, what to improve next time..." style={{...inputBase,minHeight:80,resize:"vertical"}}/></Field>
@@ -3377,7 +3416,7 @@ const ShowRecordsPage = ({ records, onNavigate, onBack }) => {
   // Most recent first
   const sorted=[...records].sort((a,b)=>new Date(b.show_date||0)-new Date(a.show_date||0));
   const allEntries=records.flatMap(getShowEntries);
-  const placingCounts=SHOW_PLACINGS.reduce((acc,p)=>({...acc,[p]:allEntries.filter(e=>e.placing===p).length}),{});
+  const placingCounts=SHOW_RANK_ORDER.reduce((acc,p)=>({...acc,[p]:allEntries.filter(e=>getEntryRank(e)===p).length}),{});
   return (
     <PageWrap>
       <PageHeader title="Show / Competition" onBack={onBack} rightSlot={<Btn small onClick={()=>onNavigate("add-show-record")}><Icon name="plus" size={14} color="#fff"/> Log</Btn>}/>
@@ -3388,7 +3427,7 @@ const ShowRecordsPage = ({ records, onNavigate, onBack }) => {
           <>
             <Card style={{ marginBottom:14 }}>
               <div style={{ display:"flex",justifyContent:"space-between",flexWrap:"wrap",gap:10 }}>
-                {SHOW_PLACINGS.filter(p=>p!=="Did Not Place").map(p=>(
+                {SHOW_RANK_ORDER.filter(p=>p!=="Did Not Place").map(p=>(
                   <div key={p} style={{ display:"flex",alignItems:"center",gap:6 }}>
                     <Icon name="rosette" color={SHOW_PLACING_COLORS[p]} size={20}/>
                     <div><div style={{ fontWeight:700,color:SHOW_PLACING_COLORS[p],fontSize:16 }}>{placingCounts[p]}</div><div style={{ fontSize:12,color:C.textMuted }}>{p}</div></div>
@@ -3402,7 +3441,8 @@ const ShowRecordsPage = ({ records, onNavigate, onBack }) => {
                 const bestPlacing=getBestPlacing(entries);
                 const barColor=SHOW_PLACING_COLORS[bestPlacing]||C.textMuted;
                 const placed=bestPlacing&&bestPlacing!=="Did Not Place";
-                const wonEntries=entries.filter(e=>e.placing&&e.placing!=="Did Not Place");
+                const wonEntries=entries.filter(e=>getEntryRank(e)&&getEntryRank(e)!=="Did Not Place")
+                  .sort((a,b)=>SHOW_RANK_ORDER.indexOf(getEntryRank(a))-SHOW_RANK_ORDER.indexOf(getEntryRank(b)));
                 return (
                   <Card key={r.id} onClick={()=>onNavigate("edit-show-record",{recordId:r.id})}
                     style={{ borderLeft:`4px solid ${barColor}`,paddingLeft:12,background:placed?`rgba(${hexToRgb(barColor)},.06)`:C.surface }}>
@@ -3415,12 +3455,12 @@ const ShowRecordsPage = ({ records, onNavigate, onBack }) => {
                         </div>
                         {wonEntries.length>0&&(
                           <div style={{ display:"flex",flexWrap:"wrap",gap:10,marginTop:8 }}>
-                            {wonEntries.map(e=>(
+                            {wonEntries.map(e=>{ const rank=getEntryRank(e); return (
                               <div key={e.id} style={{ display:"flex",alignItems:"center",gap:4 }}>
-                                <Icon name="rosette" color={SHOW_PLACING_COLORS[e.placing]} size={16}/>
-                                <span style={{ fontSize:12,fontWeight:700,color:SHOW_PLACING_COLORS[e.placing] }}>{e.placing} · {e.show_class}</span>
+                                <Icon name="rosette" color={SHOW_PLACING_COLORS[rank]} size={16}/>
+                                <span style={{ fontSize:12,fontWeight:700,color:SHOW_PLACING_COLORS[rank] }}>{rank} · {e.show_class}</span>
                               </div>
-                            ))}
+                            );})}
                           </div>
                         )}
                         {r.notes&&<div style={{ fontSize:14,color:C.textMuted,marginTop:6,fontStyle:"italic" }}>{r.notes}</div>}
@@ -3587,17 +3627,9 @@ export default function App() {
         });
         idbSet("bm_treatment_link_migrated_v1", true);
       }
-      // Api-Guard 2nd tray auto-complete: checked on every load (not a one-time migration)
-      // since it needs to re-evaluate as time passes. Once the 2nd tray's own 14 days have
-      // elapsed, the treatment marks itself complete automatically.
-      migratedHives = migratedHives.map(hv=>({
-        ...hv,
-        treatments: (hv.treatments||[]).map(t=>
-          (t.product==="Api-Guard"&&t.tray==="2nd Tray"&&!t.complete&&t.duration_days&&treatmentDaysLeft(t)===null)
-            ? {...t, complete:true}
-            : t
-        ),
-      }));
+      // Treatments no longer auto-complete on their own once their duration elapses — a
+      // finished treatment just shows as "Overdue" until it is explicitly completed (and
+      // removed) via the Active Treatment card in the inspection form.
       setHives(migratedHives);
       setApiaries(a);
       setActiveApiaryId(aid);
@@ -4054,7 +4086,21 @@ export default function App() {
       if(record.type==="Removed Queen"){
         updated={...updated,queen_since:""};
       }
-      return {...updated, interventions:[...(h.interventions||[]),record]};
+      updated = {...updated, interventions:[...(h.interventions||[]),record]};
+      // "Treat as inspection" on a Feed action logs a minimal weightOnly-style inspection
+      // entry alongside the Feed record, so the hive's last-inspected date updates (clearing
+      // it from the overdue list) without running full inspection logic — auto-queenless
+      // checks etc. are skipped for weightOnly entries, matching the existing Weight Log pattern.
+      if(record.type==="Feed"&&record.treat_as_inspection){
+        updated = {...updated, inspections:[...(updated.inspections||[]),{
+          id:uid(), date:record.date||TODAY, weight_kg:"", notes:"Logged via Feed action",
+          weightOnly:true, fromFeedAction:true,
+          queen_seen:"",eggs_seen:"",larvae_seen:"",capped_brood_seen:"",
+          queen_cells:"",queen_cell_action:"",frames_brood:"",frames_stores:"",
+          temperament:"",has_action:"no",actions:[],has_treatment:"no",
+        }]};
+      }
+      return updated;
     }));
   };
   const toggleTreatmentComplete=(hiveId,treatId)=>{
@@ -4081,9 +4127,12 @@ export default function App() {
       }
     }));
   };
+  // Completing a treatment from the inspection form removes it from the active list
+  // entirely (rather than just flagging it complete), since treatments no longer
+  // auto-complete on their own — this is the explicit "done with this treatment" action.
   const markTreatmentComplete=(hiveId,treatId)=>{
     setHives(hs=>hs.map(h=>h.id!==hiveId?h:{
-      ...h,treatments:h.treatments.map(t=>t.id===treatId?{...t,complete:true}:t)
+      ...h,treatments:h.treatments.filter(t=>t.id!==treatId)
     }));
   };
   // Api-Guard 1st tray's 14 days are up — swap in the 2nd tray, restarting the
