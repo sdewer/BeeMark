@@ -1,0 +1,24 @@
+{
+  "name": "BeeMark Hive Manager",
+  "short_name": "BeeMark",
+  "description": "Beekeeping hive management app",
+  "start_url": "/BeeMark/",
+  "display": "standalone",
+  "background_color": "#F4F7F6",
+  "theme_color": "#2DBD8F",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "/BeeMark/favicon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/BeeMark/favicon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
