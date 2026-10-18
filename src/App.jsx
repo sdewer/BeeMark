@@ -151,6 +151,18 @@ const hasActiveSkip = (hive) => {
 // If the pause is still on when the app loads during this window, it's a leftover from
 // last winter and gets switched off automatically; leaving it on through Oct–Mar is fine.
 const isWinterPauseAutoOffWindow = () => { const m=new Date().getMonth(); return m>=3&&m<=8; };
+// Winter weighing (added — Hives list weight display): the inverse of the window above,
+// i.e. October through March. Hive weight is heaviest/most meaningful as a winter-stores
+// check, so the Hives list only surfaces it during this period.
+const isWinterPeriod = () => !isWinterPauseAutoOffWindow();
+// A hive's most recent weigh-in — any inspection/weight-log entry with weight_kg set
+// (full inspections and weight-only entries alike; matches the filter WeightTrackingPage
+// uses for its chart/table). Returns null if the hive has never been weighed.
+const getLastWeightEntry = hive => {
+  const withWeight = (hive.inspections||[]).filter(i=>i.weight_kg!==undefined&&i.weight_kg!==null&&i.weight_kg!=="");
+  if(!withWeight.length) return null;
+  return withWeight.slice().sort((a,b)=>new Date(b.date)-new Date(a.date))[0];
+};
 // Check if a hive has an active feed action (no matching "Remove Feeder" after it)
 const hasActiveFeeder = (hive) => {
   const ivs = (hive.interventions||[]).slice().sort((a,b)=>new Date(a.date)-new Date(b.date));
@@ -1072,7 +1084,7 @@ const alphaNumSort=(a,b)=>{
   return 0;
 };
 
-const HiveList = ({ hives, apiaries, activeApiaryId, onSelectApiary, onNavigate, customOrder, onReorder, winterPause }) => {
+const HiveList = ({ hives, apiaries, activeApiaryId, onSelectApiary, onNavigate, customOrder, onReorder, winterPause, winterWeighingEnabled }) => {
   const [filter,setFilter]=useState("All Active");
   const [reordering,setReordering]=useState(false);
   const [dragList,setDragList]=useState([]);
@@ -1231,10 +1243,23 @@ const HiveList = ({ hives, apiaries, activeApiaryId, onSelectApiary, onNavigate,
                   {(()=>{
                     const isFeeding=hasActiveFeeder(hive);
                     const skipActive=hasActiveSkip(hive);
+                    // Winter weight (Options toggle, default on): shows the hive's last weigh-in
+                    // during the winter period only (Oct–Mar) — a quick stores check without
+                    // opening the hive. A weigh-in over ~3 months old (or none at all) shows a
+                    // "Weight?" prompt instead of a stale/missing figure.
+                    let weightTag=null;
+                    if(winterWeighingEnabled!==false&&isWinterPeriod()){
+                      const lw=getLastWeightEntry(hive);
+                      const stale=!lw||(Date.now()-new Date(lw.date))/86400000>90;
+                      weightTag=stale
+                        ?<span style={{ fontSize:13,fontWeight:600,color:C.red,background:`rgba(${hexToRgb(C.red)},.08)`,borderRadius:6,padding:"2px 8px" }}>Weight?</span>
+                        :<span style={{ fontSize:13,fontWeight:600,color:C.accent,background:`rgba(${hexToRgb(C.accent)},.1)`,borderRadius:6,padding:"2px 8px" }}>{lw.weight_kg+" kg"}</span>;
+                    }
                     return (
                     <div style={{ display:"flex",gap:8,marginTop:6,flexWrap:"wrap",alignItems:"center" }}>
                       <span style={{ fontSize:13,color:C.textMuted }}>{hive.inspections.length+" log"+(hive.inspections.length!==1?"s":"")}</span>
                       {lastIns&&<span style={{ fontSize:13,color:C.textMuted }}>{"Last: "+fmtDate(lastIns.date)}</span>}
+                      {weightTag}
                       {minDays!==null&&<span style={{ fontSize:13,fontWeight:600,color:C.orange,background:`rgba(${hexToRgb(C.orange)},.1)`,borderRadius:6,padding:"2px 8px" }}>{"Treatment: "+minDays+"d left"}</span>}
                       {hasOverdueTreat&&minDays===null&&<span style={{ fontSize:13,fontWeight:600,color:C.red,background:`rgba(${hexToRgb(C.red)},.08)`,borderRadius:6,padding:"2px 8px" }}>Treatment overdue</span>}
                       {needsSecondTray&&<span style={{ fontSize:13,fontWeight:600,color:C.honey,background:`rgba(${hexToRgb(C.honey)},.14)`,borderRadius:6,padding:"2px 8px" }}>Add 2nd Api-Guard tray</span>}
@@ -2974,7 +2999,7 @@ const BeekeeperInfo = ({ onBack }) => {
 // ── Data Transfer Page ──────────────────────────────────────────────────────
 // APP_VERSION bumped here whenever the data schema changes — exported files carry it
 const APP_VERSION = 11;
-const APP_DISPLAY_VERSION = "v1.12.0";
+const APP_DISPLAY_VERSION = "v1.13.0";
 
 const DataTransfer = ({ hives, apiaries, activeApiaryId, equipManual, honeyHarvests, showRecords, onImport, onBack }) => {
   const [importStatus,setImportStatus]=useState("");
@@ -3528,7 +3553,7 @@ const InfoHub = ({ hives, apiaries, onNavigate }) => {
 };
 
 // ── Options (app-wide settings) ─────────────────────────────────────────────
-const OptionsPage = ({ winterPause, onSetWinterPause, onBack }) => {
+const OptionsPage = ({ winterPause, onSetWinterPause, winterWeighingEnabled, onSetWinterWeighingEnabled, onBack }) => {
   return (
     <PageWrap>
       <PageHeader title="Options" onBack={onBack}/>
@@ -3550,6 +3575,22 @@ const OptionsPage = ({ winterPause, onSetWinterPause, onBack }) => {
           <div style={{ display:"flex",alignItems:"center",justifyContent:"space-between",background:"#fff",borderRadius:10,padding:"12px 14px",border:`1px solid rgba(${hexToRgb(C.red)},.25)` }}>
             <div style={{ fontWeight:700,color:C.textPrimary,fontSize:15 }}>{winterPause?"Inspections paused for winter":"Inspections active"}</div>
             <Toggle value={!!winterPause} onChange={onSetWinterPause} label=""/>
+          </div>
+        </Card>
+        <Card style={{ marginBottom:16 }}>
+          <div style={{ display:"flex",alignItems:"center",gap:10,marginBottom:10 }}>
+            <Icon name="scale" color={C.accent} size={20}/>
+            <div style={{ fontWeight:800,fontSize:17,color:C.textPrimary }}>Winter Weighing</div>
+          </div>
+          <div style={{ fontSize:14,color:C.textSecondary,lineHeight:1.6,marginBottom:14 }}>
+            From October to March, the Hives list shows each hive's last recorded weight —
+            a quick stores check without opening the hive. If the last weigh-in is more than
+            3 months old (or there isn't one), it shows "Weight?" instead, as a reminder to
+            weigh it. Switch this off if you'd rather the hive list stayed uncluttered over winter.
+          </div>
+          <div style={{ display:"flex",alignItems:"center",justifyContent:"space-between",background:C.bg,borderRadius:10,padding:"12px 14px",border:`1px solid ${C.border}` }}>
+            <div style={{ fontWeight:700,color:C.textPrimary,fontSize:15 }}>{winterWeighingEnabled!==false?"Showing winter weight":"Winter weight hidden"}</div>
+            <Toggle value={winterWeighingEnabled!==false} onChange={onSetWinterWeighingEnabled} label=""/>
           </div>
         </Card>
       </div>
@@ -3575,6 +3616,10 @@ export default function App() {
   // last-inspected date without the overdue warning ever firing. Auto-disabled at the
   // start of April each year (see isWinterPauseAutoOffWindow / the mount-effect check below).
   const [winterPause,setWinterPause]=useState(false);
+  // Winter weighing (Options) — shows each hive's last weigh-in on the Hives list during
+  // the Oct–Mar winter period (Critical Rule, see CLAUDE.md). Defaults to on; no auto-off
+  // window like winterPause above, since showing a weight figure has no downside to leaving on.
+  const [winterWeighingEnabled,setWinterWeighingEnabled]=useState(true);
   const [equipManual,setEquipManual]=useState({
     broodBoxes_total:0, supers_total:0, queenExcluders_total:0,
     nucs_total:0, nucBroodBoxes_total:0, matingNucs_total:0, feeders_total:0, roofs_total:0, floors_total:0, crownBoards_total:0,
@@ -3584,7 +3629,7 @@ export default function App() {
   useEffect(()=>{
     (async()=>{
       await migrateFromLocalStorage();
-      const [h,a,aid,ho,em,hh,paletteMigrated,treatmentLinkMigrated,wp,sr] = await Promise.all([
+      const [h,a,aid,ho,em,hh,paletteMigrated,treatmentLinkMigrated,wp,sr,wwe] = await Promise.all([
         idbGet("bm_hives3",[]),
         idbGet("bm_apiaries3",null),
         idbGet("bm_activeApiary3",null),
@@ -3595,6 +3640,7 @@ export default function App() {
         idbGet("bm_treatment_link_migrated_v1",false),
         idbGet("bm_winter_pause",false),
         idbGet("bm_show_records",[]),
+        idbGet("bm_winter_weighing_enabled",true),
       ]);
       // One-time: move every hive onto the new distinguishable 12-colour palette,
       // and backfill Queen Since (for queen age tracking) from the Installed date
@@ -3645,6 +3691,7 @@ export default function App() {
         idbSet("bm_winter_pause",false);
       }
       setWinterPause(winterPauseValue);
+      setWinterWeighingEnabled(wwe!==false);
       setDbReady(true);
     })();
   },[]);
@@ -3657,6 +3704,7 @@ export default function App() {
   useEffect(()=>{ if(!dbReady) return; idbSet("bm_equip_manual",equipManual); },[equipManual,dbReady]);
   useEffect(()=>{ if(!dbReady) return; idbSet("bm_honey_harvests",honeyHarvests); },[honeyHarvests,dbReady]);
   useEffect(()=>{ if(!dbReady) return; idbSet("bm_winter_pause",winterPause); },[winterPause,dbReady]);
+  useEffect(()=>{ if(!dbReady) return; idbSet("bm_winter_weighing_enabled",winterWeighingEnabled); },[winterWeighingEnabled,dbReady]);
   useEffect(()=>{ if(!dbReady) return; idbSet("bm_show_records",showRecords); },[showRecords,dbReady]);
 
   const handleSetManual=(k,v)=>setEquipManual(prev=>({...prev,[k]:Math.max(0,Number(v)||0)}));
@@ -4210,7 +4258,7 @@ export default function App() {
   });
 
   let content=null;
-  if(screen==="hives"||screen==="dashboard") content=<HiveList hives={hives} apiaries={apiaries} activeApiaryId={activeApiaryId||currentApiaryId} onSelectApiary={setActiveApiaryId} onNavigate={navigate} customOrder={hiveOrder} onReorder={setHiveOrder} winterPause={winterPause}/>;
+  if(screen==="hives"||screen==="dashboard") content=<HiveList hives={hives} apiaries={apiaries} activeApiaryId={activeApiaryId||currentApiaryId} onSelectApiary={setActiveApiaryId} onNavigate={navigate} customOrder={hiveOrder} onReorder={setHiveOrder} winterPause={winterPause} winterWeighingEnabled={winterWeighingEnabled}/>;
   else if(screen==="apiary-settings") content=<ApiarySettings apiaries={apiaries} hives={hives} activeApiaryId={currentApiaryId} onSaveApiary={saveApiary} onAddApiary={addApiary} onDeleteApiary={deleteApiary} onSelectApiary={setActiveApiaryId} onNavigate={navigate}/>;
   else if(screen==="apiary-detail")   { const a=apiaries.find(x=>x.id===params.apiaryId); if(a) content=<ApiaryDetail apiary={a} hives={hives} onBack={goBack} onEdit={()=>navigate("apiary-edit",{apiaryId:a.id})} onDelete={id=>{ deleteApiary(id); navigate("apiary-settings"); }} onSaveNotes={saveApiary} onNavigate={navigate} customOrder={hiveOrder}/>; }
   else if(screen==="apiary-edit")     { const a=apiaries.find(x=>x.id===params.apiaryId); if(a) content=<ApiaryEdit apiary={a} onSave={a2=>{ saveApiary(a2); navigate("apiary-detail",{apiaryId:a2.id}); }} onCancel={()=>navigate("apiary-detail",{apiaryId:a.id})}/>; }
@@ -4246,12 +4294,12 @@ export default function App() {
     showRecords={showRecords}
     onBack={()=>navigate("info-hub")}/>
   else if(screen==="about-page")      content=<AboutPage onBack={()=>navigate("info-hub")}/>;
-  else if(screen==="app-options")     content=<OptionsPage winterPause={winterPause} onSetWinterPause={setWinterPause} onBack={()=>navigate("info-hub")}/>;
+  else if(screen==="app-options")     content=<OptionsPage winterPause={winterPause} onSetWinterPause={setWinterPause} winterWeighingEnabled={winterWeighingEnabled} onSetWinterWeighingEnabled={setWinterWeighingEnabled} onBack={()=>navigate("info-hub")}/>;
   else if(screen==="add-treatment")   { const h=getHive(params.hiveId); if(h) content=<TreatmentForm hive={h} onSave={saveExtra} onNavigate={navigate}/>; }
   else if(screen==="edit-treatment")  { const h=getHive(params.hiveId); const t=h&&h.treatments.find(x=>x.id===params.treatmentId); if(h&&t) content=<TreatmentForm hive={h} existing={t} onUpdate={updateTreatment} onDelete={deleteTreatment} onNavigate={navigate}/>; }
   else if(screen==="add-intervention"){ const h=getHive(params.hiveId); if(h) content=<ActionForm    hive={h} onSave={saveExtra} onNavigate={navigate} apiaries={apiaries||[]} hives={hives||[]} onMoveHive={moveHive} onSoldHive={soldHive} onShakeOutHive={shakeOutHive} onCombineHive={combineHive} onFrameEggsAction={frameEggsAction}/>; }
   else if(screen==="edit-intervention"){ const h=getHive(params.hiveId); const iv=h&&(h.interventions||[]).find(x=>x.id===params.interventionId); if(h&&iv) content=<ActionForm hive={h} existing={iv} onUpdate={updateIntervention} onDelete={deleteIntervention} onNavigate={navigate} apiaries={apiaries||[]} hives={hives||[]}/>; }
-  if(!content) content=<HiveList hives={hives} apiaries={apiaries} activeApiaryId={activeApiaryId||currentApiaryId} onSelectApiary={setActiveApiaryId} onNavigate={navigate} customOrder={hiveOrder} onReorder={setHiveOrder} winterPause={winterPause}/>;
+  if(!content) content=<HiveList hives={hives} apiaries={apiaries} activeApiaryId={activeApiaryId||currentApiaryId} onSelectApiary={setActiveApiaryId} onNavigate={navigate} customOrder={hiveOrder} onReorder={setHiveOrder} winterPause={winterPause} winterWeighingEnabled={winterWeighingEnabled}/>;
 
   if(!dbReady) return (
     <div style={{fontFamily:"'Roboto',sans-serif",minHeight:"100vh",maxWidth:480,margin:"0 auto",display:"flex",alignItems:"center",justifyContent:"center",background:C.bg}}>
